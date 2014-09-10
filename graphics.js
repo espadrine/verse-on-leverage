@@ -559,7 +559,7 @@ function paintTilesRaw(gs, end) {
 function paintNoise(gs, end) {
   var seed = (Math.random() * 1000)|0;
   var transparency = 0.3;
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + gs.width + '" height="' + gs.height + '"><filter id="a" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".01" numOctaves="5"/><feColorMatrix values="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 ' + transparency + '" seed="' + seed + '"/></filter><rect width="100%" height="100%" filter="url(#a)"/></svg>';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + gs.width + '" height="' + gs.height + '"><filter id="a" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".01" numOctaves="5" seed="' + seed + '"/><feColorMatrix values="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 ' + transparency + '"/></filter><rect width="100%" height="100%" filter="url(#a)"/></svg>';
   var image = new Image();
   image.src = 'data:image/svg+xml;base64,' + btoa(svg);
   image.onload = function() {
