@@ -642,9 +642,56 @@ function paintTilesRawCached(gs, end) {
 // gs is the GraphicState.
 function paint(gs) {
   paintTilesRawCached(gs, function(){});
+  if (currentlyDragging) {
+    paintMouseMovement(gs);
+  }
 }
 
 paint(gs);
+
+// Top left pixel of the canvas related to the window.
+var canvasOrigin = {
+  clientX: canvas.offsetLeft,
+  clientY: canvas.offsetTop
+};
+
+// Take a {clientX, clientY} pixel position in the page.
+// Return a {x, y} pixel position from the top left pixel of the canvas.
+function pixelFromClient(client) {
+  return {
+    x: client.clientX - canvasOrigin.clientX,
+    y: client.clientY - canvasOrigin.clientY
+  };
+}
+
+// gs is the GraphicState.
+function paintMouseMovement(gs) {
+  var ctx = gs.ctx;
+  var from = pixelFromClient(startMousePosition);
+  var to = pixelFromClient(lastMousePosition);
+  var deltaX = to.x - from.x;
+  var deltaY = to.y - from.y;
+  var portions = 20;
+  var dx = deltaX / portions;
+  var dy = deltaY / portions;
+  ctx.strokeStyle = '#333';
+  ctx.lineCap = 'round';
+  for (var i = 0; i < portions; i++) {
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    from.x += dx;
+    from.y += dy;
+    ctx.lineTo(from.x, from.y);
+    var quotient = i / portions - 0.5;
+    ctx.lineWidth = 7 * (4 * quotient * quotient + 0.1);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.lineTo(to.x, to.y);
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  ctx.lineWidth = 1;
+}
 
 // Paint the UI for population, winner information, etc.
 // gs is the GraphicState.
@@ -1223,7 +1270,6 @@ function mouseDrag(event) {
   gs.canvas.removeEventListener('mouseup', mouseSelection);
   gs.canvas.addEventListener('mouseup', mouseEndDrag);
   gs.canvas.addEventListener('mousemove', dragMap);
-  clearInterval(humanAnimationTimeout);
   currentlyDragging = true;
   resetDragVector();
   dragVelTo = setInterval(resetDragVector, dragVelInterval);
@@ -1233,7 +1279,6 @@ function mouseEndDrag(event) {
   gs.canvas.style.cursor = '';
   gs.canvas.removeEventListener('mousemove', dragMap);
   gs.canvas.removeEventListener('mouseup', mouseEndDrag);
-  humanAnimationTimeout = setInterval(animateHumans, 100);
   currentlyDragging = false;
   paint(gs);
   clearInterval(dragVelTo);
@@ -1245,10 +1290,12 @@ gs.canvas.onmousedown = function mouseInputManagement(event) {
   if (event.button === 0) {
     gs.canvas.addEventListener('mouseup', mouseSelection);
     gs.canvas.addEventListener('mousemove', mouseDrag);
+    startMousePosition.clientX = event.clientX;
+    startMousePosition.clientY = event.clientY;
     lastMousePosition.clientX = event.clientX;
     lastMousePosition.clientY = event.clientY;
   } else if (event.button === 2) {
-    enterTravelMode();
+    // FIXME: Direct move.
     mouseSelection(event);
     enterNormalMode();
   }
@@ -1262,6 +1309,7 @@ gs.canvas.oncontextmenu = function(e) { e.preventDefault(); };
   window.requestAnimationFrame = requestAnimationFrame;
 }());
 
+var startMousePosition = { clientX: 0, clientY: 0 };
 var lastMousePosition = { clientX: 0, clientY: 0 };
 var drawingWhileDragging = false;
 var currentlyDragging = false;

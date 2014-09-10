@@ -27,12 +27,14 @@ Terrain.prototype = {
   // - r: resource (boolean).
   // - f: fortification (see `element`).
   // - n: next parcels connected to this one (as a list of "q:r").
+  // - a: random number between 0 and 1.
   tile: function tile(coord) {
     var key = this.keyFromTile(coord);
     if (this.data[key] == null) {
       this.data[key] = {
         t: (Math.random() * 4)|0,
-        r: (coord.q % 3) === 0 && (coord.r % 3 === 2)
+        r: (coord.q % 3) === 0 && (coord.r % 3 === 2),
+        a: Math.random()
       };
     }
     return this.data[key];
@@ -140,9 +142,10 @@ function pixelFromTile(p, px0, size) {
 // `tile` {q,r} is given as input to the randomness.
 // The result will be the same for each tile.
 function noisyPixel(size, tile) {
+  var t = terrain.tile(tile);
   var c = { x: 0, y: 0 };
-  c.x += (tile.q ^ tile.r) % size;
-  c.y +=  (tile.q ^ tile.r) % size;
+  c.x += (tile.q ^ tile.r ^ t.a) % size;
+  c.y +=  (tile.q ^ tile.r ^ t.a) % size;
   return c;
 }
 
@@ -166,8 +169,8 @@ function makeGraphicState(canvas) {
 }
 
 var canvas = document.getElementById('canvas');
-canvas.width = 1280; //document.documentElement.clientWidth;
-canvas.height = 720; //document.documentElement.clientHeight;
+canvas.width = 1280;
+canvas.height = 720;
 canvas.style.marginLeft = ((document.documentElement.clientWidth - canvas.width) >> 1) + 'px';
 var gs = makeGraphicState(canvas);
 var globalGs = gs;
@@ -600,11 +603,6 @@ function paintTilesRaw(gs, end) {
       } else if (t.t == element.water) {
         color = [50, 50, 180];
       }
-      // Rainfall
-      //var rain = Math.min(Math.abs(color[0] - color[1]) / 2 * t.rain, 255);
-      //color[0] -= rain; // darker red
-      //color[1] -= rain; // darker green
-      //color[2] -= Math.min(t.rain * 50, 255);   // darker blue
       // Pixel noise
       var position = (x + y * width) * 4;
       var pixelDelta = 40;
@@ -626,7 +624,7 @@ function paintTilesRaw(gs, end) {
 function paintNoise(gs, end) {
   var seed = (Math.random() * 1000)|0;
   var transparency = 0.3;
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + gs.width + '" height="' + gs.height + '"><filter id="a" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".01" numOctaves="5"/><feColorMatrix values="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 ' + transparency + '" seed="' + seed + '"/></filter><rect width="100%" height="100%" filter="url(#a)"/></svg>';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + gs.width + '" height="' + gs.height + '"><filter id="a" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".01" numOctaves="5" seed="' + seed + '"/><feColorMatrix values="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 ' + transparency + '"/></filter><rect width="100%" height="100%" filter="url(#a)"/></svg>';
   var image = new Image();
   image.src = 'data:image/svg+xml;base64,' + btoa(svg);
   image.onload = function() {
@@ -709,9 +707,56 @@ function paintTilesRawCached(gs, end) {
 // gs is the GraphicState.
 function paint(gs) {
   paintTilesRawCached(gs, function(){});
+  if (currentlyDragging) {
+    paintMouseMovement(gs);
+  }
 }
 
 paint(gs);
+
+// Top left pixel of the canvas related to the window.
+var canvasOrigin = {
+  clientX: canvas.offsetLeft,
+  clientY: canvas.offsetTop
+};
+
+// Take a {clientX, clientY} pixel position in the page.
+// Return a {x, y} pixel position from the top left pixel of the canvas.
+function pixelFromClient(client) {
+  return {
+    x: client.clientX - canvasOrigin.clientX,
+    y: client.clientY - canvasOrigin.clientY
+  };
+}
+
+// gs is the GraphicState.
+function paintMouseMovement(gs) {
+  var ctx = gs.ctx;
+  var from = pixelFromClient(startMousePosition);
+  var to = pixelFromClient(lastMousePosition);
+  var deltaX = to.x - from.x;
+  var deltaY = to.y - from.y;
+  var portions = 20;
+  var dx = deltaX / portions;
+  var dy = deltaY / portions;
+  ctx.strokeStyle = '#333';
+  ctx.lineCap = 'round';
+  for (var i = 0; i < portions; i++) {
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    from.x += dx;
+    from.y += dy;
+    ctx.lineTo(from.x, from.y);
+    var quotient = i / portions - 0.5;
+    ctx.lineWidth = 7 * (4 * quotient * quotient + 0.1);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.lineTo(to.x, to.y);
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  ctx.lineWidth = 1;
+}
 
 // Paint the UI for population, winner information, etc.
 // gs is the GraphicState.
@@ -1290,7 +1335,6 @@ function mouseDrag(event) {
   gs.canvas.removeEventListener('mouseup', mouseSelection);
   gs.canvas.addEventListener('mouseup', mouseEndDrag);
   gs.canvas.addEventListener('mousemove', dragMap);
-  clearInterval(humanAnimationTimeout);
   currentlyDragging = true;
   resetDragVector();
   dragVelTo = setInterval(resetDragVector, dragVelInterval);
@@ -1300,7 +1344,6 @@ function mouseEndDrag(event) {
   gs.canvas.style.cursor = '';
   gs.canvas.removeEventListener('mousemove', dragMap);
   gs.canvas.removeEventListener('mouseup', mouseEndDrag);
-  humanAnimationTimeout = setInterval(animateHumans, 100);
   currentlyDragging = false;
   paint(gs);
   clearInterval(dragVelTo);
@@ -1312,10 +1355,12 @@ gs.canvas.onmousedown = function mouseInputManagement(event) {
   if (event.button === 0) {
     gs.canvas.addEventListener('mouseup', mouseSelection);
     gs.canvas.addEventListener('mousemove', mouseDrag);
+    startMousePosition.clientX = event.clientX;
+    startMousePosition.clientY = event.clientY;
     lastMousePosition.clientX = event.clientX;
     lastMousePosition.clientY = event.clientY;
   } else if (event.button === 2) {
-    enterTravelMode();
+    // FIXME: Direct move.
     mouseSelection(event);
     enterNormalMode();
   }
@@ -1329,6 +1374,7 @@ gs.canvas.oncontextmenu = function(e) { e.preventDefault(); };
   window.requestAnimationFrame = requestAnimationFrame;
 }());
 
+var startMousePosition = { clientX: 0, clientY: 0 };
 var lastMousePosition = { clientX: 0, clientY: 0 };
 var drawingWhileDragging = false;
 var currentlyDragging = false;
