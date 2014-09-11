@@ -22,10 +22,10 @@ Terrain.prototype = {
   // Get information about the tile at hexagonal coordinates `coord` {q, r}.
   // Returns
   // - t: terrain type (see `element`).
-  // - c: camp.
+  // - c: camp. (Can be undefined.)
   // - p: power.
   // - r: resource (boolean).
-  // - f: fortification (see `element`).
+  // - f: fortification (see `element`). (Can be undefined.)
   // - n: next parcels connected to this one (as a list of "q:r").
   // - a: random number between 0 and 1.
   tile: function tile(coord) {
@@ -34,7 +34,9 @@ Terrain.prototype = {
       this.data[key] = {
         t: (Math.random() * 4)|0,
         r: (coord.q % 3) === 0 && (coord.r % 3 === 2),
-        a: Math.random()
+        a: Math.random(),
+        p: 0,
+        n: [],
       };
     }
     return this.data[key];

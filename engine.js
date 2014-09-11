@@ -4,15 +4,16 @@ var terrain;
 var numberOfCamps = 2;
 var playerCamp = 0;
 
-// Get all visible tiles of a certain type.
+// Takes a filter `function valid(tile = {q,r}, terrainTile)`
+// (see `terrain.js`).
 // Returns a list of {q,r}.
-function visibleTilesFromType(type) {
+function visibleTilesFilter(valid) {
   getVisibleTiles(gs);
   var tiles = [];
   for (var i = 0; i < visibleTiles.length; i++) {
-    var tile = visibleTiles[i];
-    if (tile.t === type) {
-      tiles.push(tile);
+    var terrainTile = terrain.tile(visibleTiles[i]);
+    if (valid(visibleTiles[i], terrainTile)) {
+      tiles.push(visibleTiles[i]);
     }
   }
   return tiles;
@@ -21,10 +22,17 @@ function visibleTilesFromType(type) {
 var campCursorId = 0;
 function Camp() {
   this.id = campCursorId;
+  campCursorId++;
   // Find a starting location.
   getVisibleTiles(gs);
-  var earthTiles = visibleTilesFromType(element.earth);
+  var earthTiles = visibleTilesFilter(function(tile, terrainTile) {
+    return terrainTile.t === element.earth && terrainTile.c === (void 0);
+  });
   this.baseTile = earthTiles[(Math.random() * earthTiles.length)|0];
+  // Give this tile to us!
+  var ourTile = terrain.tile(this.baseTile);
+  ourTile.c = this.id;
+  ourTile.p = 1;
 }
 Camp.prototype = {
   id: 0,

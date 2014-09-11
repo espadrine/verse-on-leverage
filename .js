@@ -22,10 +22,10 @@ Terrain.prototype = {
   // Get information about the tile at hexagonal coordinates `coord` {q, r}.
   // Returns
   // - t: terrain type (see `element`).
-  // - c: camp.
+  // - c: camp. (Can be undefined.)
   // - p: power.
   // - r: resource (boolean).
-  // - f: fortification (see `element`).
+  // - f: fortification (see `element`). (Can be undefined.)
   // - n: next parcels connected to this one (as a list of "q:r").
   // - a: random number between 0 and 1.
   tile: function tile(coord) {
@@ -34,7 +34,9 @@ Terrain.prototype = {
       this.data[key] = {
         t: (Math.random() * 4)|0,
         r: (coord.q % 3) === 0 && (coord.r % 3 === 2),
-        a: Math.random()
+        a: Math.random(),
+        p: 0,
+        n: [],
       };
     }
     return this.data[key];
@@ -568,13 +570,9 @@ function paintTileHexagon(gs, tile, color, lineWidth) {
   ctx.beginPath();
   ctx.arc(cp.x, cp.y, radius, 0, 2*Math.PI, true);
   ctx.closePath();
-  ctx.shadowBlur = 4;
-  ctx.shadowColor = color;
   ctx.strokeStyle = color;
   ctx.lineWidth = lineWidth? lineWidth: 3;
   ctx.stroke();
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
   ctx.lineWidth = 1;
 }
 
@@ -623,6 +621,7 @@ function paintTilesRaw(gs, end) {
 }
 
 // List of {q,r} tiles on the screen.
+var allTiles = [];
 var visibleTiles = [];
 function getVisibleTiles(gs) {
   if (visibleTiles.length > 0) { return visibleTiles; }
@@ -640,27 +639,29 @@ function getVisibleTiles(gs) {
   var hexHorizDistance = size * Math.sqrt(3);
   var hexVertDistance = size * 3/2;
 
-  for (var i = 0; i < 9; i++) {
-    var offLeft = true;     // Each row is offset from the row above.
-    var cx = centerPixel.x;
-    var cy = centerPixel.y;
-    while (cy - hexVertDistance < height) {
-      while (cx - hexHorizDistance < width) {
-        tilePos = tileFromPixel({ x:cx, y:cy }, origin, size);
+  var offLeft = true;     // Each row is offset from the row above.
+  var cx = centerPixel.x;
+  var cy = centerPixel.y;
+  while (cy - hexVertDistance < height) {
+    while (cx - hexHorizDistance < width) {
+      tilePos = tileFromPixel({ x:cx, y:cy }, origin, size);
+      allTiles.push(tilePos);
+      if ((cx - hexHorizDistance/2 > 0) && (cx + hexHorizDistance/2 < gs.width)
+        &&(cy - hexVertDistance/2 > 0) && (cy + hexVertDistance/2 < gs.height)) {
         visibleTiles.push(tilePos);
-        cx += hexHorizDistance;
       }
-      cy += hexVertDistance;
-      cx = centerPixel.x;
-      if (offLeft) {
-        cx -= hexHorizDistance / 2;   // This row is offset.
-        offLeft = false;
-      } else {
-        offLeft = true;
-      }
-      cx = cx|0;
-      cy = cy|0;
+      cx += hexHorizDistance;
     }
+    cy += hexVertDistance;
+    cx = centerPixel.x;
+    if (offLeft) {
+      cx -= hexHorizDistance / 2;   // This row is offset.
+      offLeft = false;
+    } else {
+      offLeft = true;
+    }
+    cx = cx|0;
+    cy = cy|0;
   }
   return visibleTiles;
 }
@@ -700,8 +701,8 @@ function paintTilesSmooth(gs, end) {
   for (var tileType = 0; tileType < 4; tileType++) {
     var tiles = Object.create(null);
     // Add all tiles of that type.
-    for (var i = 0; i < visibleTiles.length; i++) {
-      var tile = visibleTiles[i];
+    for (var i = 0; i < allTiles.length; i++) {
+      var tile = allTiles[i];
       var t = terrain.tile(tile);
       if (t.t >= tileType) {
         tiles[terrain.keyFromTile(tile)] = true;
@@ -812,9 +813,6 @@ function paint(gs) {
     paintIntermediateUI(gs);
   });
   paintIntermediateUI(gs);
-  if (currentlyDragging) {
-    paintMouseMovement(gs);
-  }
 }
 
 // Top left pixel of the canvas related to the window.
@@ -835,7 +833,8 @@ function pixelFromClient(client) {
 // gs is the GraphicState.
 function paintMouseMovement(gs) {
   var ctx = gs.ctx;
-  var from = pixelFromClient(startMousePosition);
+  var from = pixelFromTile(tileFromPixel(pixelFromClient(startMousePosition),
+        gs.origin, gs.hexSize), gs.origin, gs.hexSize);
   var to = pixelFromClient(lastMousePosition);
   var deltaX = to.x - from.x;
   var deltaY = to.y - from.y;
@@ -868,9 +867,12 @@ setTimeout(function() { showTitleScreen = false; paint(gs); }, 8000);
 // gs is the GraphicState.
 function paintIntermediateUI(gs) {
   var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
+  if (currentlyDragging) {
+    paintMouseMovement(gs);
+  }
   // Show tiles controlled by a player.
   if (currentTile != null && playerCamp != null) {
-    paintTileHexagon(gs, currentTile, campHsl(playerCamp, 100, 70));
+    paintTileHexagon(gs, currentTile, campHsl(playerCamp, 50, 40), 5);
   }
   paintCamps(gs);
   // Paint the set of accessible tiles.
@@ -1184,46 +1186,29 @@ function paintCamps(gs) {
   for (var i = 0; i < numberOfCamps; i++) { visibleCamps[i] = {}; }
   for (var i = 0; i < visibleTiles.length; i++) {
     var humans = terrain.tile(visibleTiles[i]);
-    if (humans.c) {
-      visibleCamps[humans.c][visibleTiles[i]] = true;
+    if (humans.c !== (void 0)) {
+      var cp = pixelFromTile(visibleTiles[i], gs.origin, gs.hexSize);
+      var radius = 10;
+
+      ctx.beginPath();
+      ctx.arc(cp.x, cp.y, radius, 0, 2*Math.PI, true);
+      ctx.closePath();
+      ctx.fillStyle = campHsl(humans.c, 50, 40);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(cp.x, cp.y, radius - 2, 0, 2*Math.PI, true);
+      ctx.closePath();
+      ctx.strokeStyle = 'white';
+      ctx.stroke();
+
+      ctx.font = radius + 'px sans-serif';
+      ctx.fillStyle = 'white';
+      var power = '' + humans.p;
+      var powerSize = ctx.measureText(power).width;
+      ctx.fillText(power, cp.x - powerSize / 2, cp.y + radius / 4);
     }
   }
-  var bold = gs.hexSize * 2/3;
-  var hexHorizDistance = gs.hexSize * Math.sqrt(3);
-  var hexVertDistance = gs.hexSize * 3/2;
-  for (var i = 0; i < numberOfCamps; i++) {
-    // Background border.
-    // Mostly because Chrome's clip() pixelates.
-    pathFromTiles(gs, visibleCamps[i],
-        hexHorizDistance, hexVertDistance, /*noisy*/ true, /*dashed*/ false);
-    ctx.lineWidth = bold / 4;
-    ctx.strokeStyle = campHsl(i, 70, 35);
-    ctx.stroke();
-    // Dashed border.
-    pathFromTiles(gs, visibleCamps[i],
-        hexHorizDistance, hexVertDistance, /*noisy*/ true, /*dashed*/ true);
-    ctx.lineWidth = bold / 8;
-    ctx.strokeStyle = campHsl(i, 80, 42);
-    ctx.stroke();
-  }
-
-  for (var i = 0; i < numberOfCamps; i++) {
-    // Inside translucent border.
-    pathFromTiles(gs, visibleCamps[i],
-        hexHorizDistance, hexVertDistance, /*noisy*/ true, /*dashed*/ false);
-    ctx.save();
-    ctx.clip();
-    ctx.lineWidth = bold;
-    ctx.strokeStyle = 'hsla(' + campHueCreator9000(i) + ',70%,40%,0.4)';
-    ctx.stroke();
-    // Inside border.
-    ctx.lineWidth = bold / 4;
-    ctx.strokeStyle = campHsl(i, 70, 35);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  ctx.lineWidth = 1;
 }
 
 // Return CSS hsl string.
@@ -1497,15 +1482,16 @@ var terrain;
 var numberOfCamps = 2;
 var playerCamp = 0;
 
-// Get all visible tiles of a certain type.
+// Takes a filter `function valid(tile = {q,r}, terrainTile)`
+// (see `terrain.js`).
 // Returns a list of {q,r}.
-function visibleTilesFromType(type) {
+function visibleTilesFilter(valid) {
   getVisibleTiles(gs);
   var tiles = [];
   for (var i = 0; i < visibleTiles.length; i++) {
-    var tile = visibleTiles[i];
-    if (tile.t === type) {
-      tiles.push(tile);
+    var terrainTile = terrain.tile(visibleTiles[i]);
+    if (valid(visibleTiles[i], terrainTile)) {
+      tiles.push(visibleTiles[i]);
     }
   }
   return tiles;
@@ -1514,10 +1500,17 @@ function visibleTilesFromType(type) {
 var campCursorId = 0;
 function Camp() {
   this.id = campCursorId;
+  campCursorId++;
   // Find a starting location.
   getVisibleTiles(gs);
-  var earthTiles = visibleTilesFromType(element.earth);
+  var earthTiles = visibleTilesFilter(function(tile, terrainTile) {
+    return terrainTile.t === element.earth && terrainTile.c === (void 0);
+  });
   this.baseTile = earthTiles[(Math.random() * earthTiles.length)|0];
+  // Give this tile to us!
+  var ourTile = terrain.tile(this.baseTile);
+  ourTile.c = this.id;
+  ourTile.p = 1;
 }
 Camp.prototype = {
   id: 0,
