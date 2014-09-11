@@ -1,5 +1,3 @@
-var terrain = new Terrain();
-
 // Orientation of the second pixel related to the first,
 // in radians, trigonometric direction. Both pixels are {x, y}.
 function orientation(p1, p2) {
@@ -79,8 +77,8 @@ function pixelFromTile(p, px0, size) {
 function noisyPixel(size, tile) {
   var t = terrain.tile(tile);
   var c = { x: 0, y: 0 };
-  c.x += (t.a * size);
-  c.y +=  (t.a * size);
+  c.x += (t.a * (size << 1)) - size|0;
+  c.y +=  (t.a * (size << 1)) - size|0;
   return c;
 }
 
@@ -501,13 +499,17 @@ function paintTileHexagon(gs, tile, color, lineWidth) {
   var hexHorizDistance = size * Math.sqrt(3);
   var hexVertDistance = size * 3/2;
   var cp = pixelFromTile(tile, origin, size);
-  var radius = hexVertDistance;
+  var radius = hexVertDistance >> 2;
   ctx.beginPath();
   ctx.arc(cp.x, cp.y, radius, 0, 2*Math.PI, true);
   ctx.closePath();
+  ctx.shadowBlur = 4;
+  ctx.shadowColor = color;
   ctx.strokeStyle = color;
   ctx.lineWidth = lineWidth? lineWidth: 3;
   ctx.stroke();
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
   ctx.lineWidth = 1;
 }
 
@@ -741,13 +743,14 @@ function paintTilesRawCached(gs, end) {
 // Paint on a canvas.
 // gs is the GraphicState.
 function paint(gs) {
-  paintTilesRawCached(gs, function(){});
+  paintTilesRawCached(gs, function(){
+    paintIntermediateUI(gs);
+  });
+  paintIntermediateUI(gs);
   if (currentlyDragging) {
     paintMouseMovement(gs);
   }
 }
-
-paint(gs);
 
 // Top left pixel of the canvas related to the window.
 var canvasOrigin = {
@@ -793,42 +796,26 @@ function paintMouseMovement(gs) {
   ctx.lineWidth = 1;
 }
 
+var showTitleScreen = true;
+setTimeout(function() { showTitleScreen = false; paint(gs); }, 8000);
+
 // Paint the UI for population, winner information, etc.
 // gs is the GraphicState.
 function paintIntermediateUI(gs) {
   var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
-  // Paint unzoomed map information.
-  if (size < 5) { drawMapPlaces(gs); }
   // Show tiles controlled by a player.
-  for (var tileKey in lockedTiles) {
-    paintTileHexagon(gs, terrain.tileFromKey(tileKey),
-        campHsl(lockedTiles[tileKey]), 1);
-  }
   if (currentTile != null && playerCamp != null) {
-    paintTileHexagon(gs, currentTile, campHsl(playerCamp, 100, 40));
+    paintTileHexagon(gs, currentTile, campHsl(playerCamp, 100, 70));
   }
   paintCamps(gs);
   // Paint the set of accessible tiles.
   ctx.lineWidth = 1.5;
   paintAroundTiles(gs, accessibleTiles);
   ctx.lineWidth = 1;
-  if (currentTile != null && targetTile != null &&
-      (selectionMode === selectionModes.travel ||
-       selectionMode === selectionModes.split)) {
-    // Paint the path that the selected folks would take.
-    paintAlongTiles(gs, terrain.pathFromParents(
-          terrain.keyFromTile(targetTile), accessibleTiles));
-  }
-  // Paint the path that folks will take.
-  for (var to in registerMoves) {
-    paintAlongTiles(gs,
-        terrain.humanTravelPath(registerMoves[to], terrain.tileFromKey(to)));
-  }
   paintTileMessages(gs);
   if (gameOver !== undefined) {
     drawTitle(gs, [
-        campNames[gameOver.winners[0]]
-        + " won a " + gameOver.winType + " Victory.",
+        gameOver.winType + " Victory.",
         (gameOver.winners[0] === playerCamp
          ? ("YOU WON! (" + nth(localStorage.getItem('gamesWon')) + " win!)")
          : ("YOU NEARLY WON! " +
@@ -837,7 +824,8 @@ function paintIntermediateUI(gs) {
         campHsl(gameOver.winners[0]));
   }
   if (showTitleScreen) {
-    drawTitle(gs, ["Welcome to Thaddée Tyl's…", "NOT MY TERRITORY", "(YET)"]);
+    drawTitle(gs, ["Welcome to Thaddée Tyl's…", "A Verse On Leverage",
+        "Give me a lever long enough; I shall lift the universe!"]);
   }
   displayedPaintContext.drawImage(canvas, 0, 0);
 }
@@ -940,6 +928,12 @@ function updateHumans() {
     }
   }
 }
+
+// Pixels currently on display. Useful for smooth animations.
+var displayedPaint = document.createElement('canvas');
+displayedPaint.width = gs.width;
+displayedPaint.height = gs.height;
+var displayedPaintContext = displayedPaint.getContext('2d');
 
 // Paint the animation of people moving around.
 // gs is the GraphicState.
@@ -1092,14 +1086,14 @@ function drawShell() {
 
 // artilleryFire: map from a "q:r" target to a list of "q:r" artilleries.
 function addShells(movementAnimations, artilleryFire) {
-  var visibleHumans = listVisibleHumans(gs);
+  getVisibleTiles(gs);
   for (var targetTileKey in artilleryFire) {
     var tileKeys = artilleryFire[targetTileKey];
     for (var i = 0; i < tileKeys.length; i++) {
       var tileKey = tileKeys[i];
       // Check that we can see it.
-      if (visibleHumans.indexOf(tileKey) >= 0
-       || visibleHumans.indexOf(targetTileKey) >= 0) {
+      if (visibleTiles.indexOf(tileKey) >= 0
+       || visibleTiles.indexOf(targetTileKey) >= 0) {
         var fromTile = terrain.tileFromKey(tileKey);
         var toTile = terrain.tileFromKey(targetTileKey);
         var from = pixelFromTile(fromTile, gs.origin, gs.hexSize);
@@ -1117,74 +1111,54 @@ function addShells(movementAnimations, artilleryFire) {
 
 
 
-var numberOfCamps = 2;
 // gs is the GraphicState.
 function paintCamps(gs) {
   var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
-  var visibleHumans = listVisibleHumans(gs);
+  getVisibleTiles(gs);
   var visibleCamps = new Array(numberOfCamps);
   for (var i = 0; i < numberOfCamps; i++) { visibleCamps[i] = {}; }
-  for (var i = 0; i < visibleHumans.length; i++) {
-    var humans = humanityData[visibleHumans[i]];
-    visibleCamps[humans.c][visibleHumans[i]] = true;
+  for (var i = 0; i < visibleTiles.length; i++) {
+    var humans = terrain.tile(visibleTiles[i]);
+    if (humans.c) {
+      visibleCamps[humans.c][visibleTiles[i]] = true;
+    }
   }
   var bold = gs.hexSize * 2/3;
   var hexHorizDistance = gs.hexSize * Math.sqrt(3);
   var hexVertDistance = gs.hexSize * 3/2;
-  if (size < 5) {
-    // We're too far above.
-    ctx.fillStyle = 'black';
-    var bSize = 2 * size;
-    for (var i = 0; i < numberOfCamps; i++) {
-      var visibleCamp = visibleCamps[i];
-      for (var key in visibleCamp) {
-        var px = pixelFromTile(terrain.tileFromKey(key), origin, size);
-        ctx.fillRect(px.x - bSize, px.y - bSize, 2 * bSize, 2 * bSize);
-      }
-    }
-    for (var i = 0; i < numberOfCamps; i++) {
-      ctx.fillStyle = campHsl(i);
-      var visibleCamp = visibleCamps[i];
-      for (var key in visibleCamp) {
-        var px = pixelFromTile(terrain.tileFromKey(key), origin, size);
-        ctx.fillRect(px.x - size, px.y - size, 2 * size, 2 * size);
-      }
-    }
-  } else {
-    for (var i = 0; i < numberOfCamps; i++) {
-      // Background border.
-      // Mostly because Chrome's clip() pixelates.
-      pathFromTiles(gs, visibleCamps[i],
-          hexHorizDistance, hexVertDistance, /*noisy*/ true, /*dashed*/ false);
-      ctx.lineWidth = bold / 4;
-      ctx.strokeStyle = campHsl(i, 70, 35);
-      ctx.stroke();
-      // Dashed border.
-      pathFromTiles(gs, visibleCamps[i],
-          hexHorizDistance, hexVertDistance, /*noisy*/ true, /*dashed*/ true);
-      ctx.lineWidth = bold / 8;
-      ctx.strokeStyle = campHsl(i, 80, 42);
-      ctx.stroke();
-    }
-
-    for (var i = 0; i < numberOfCamps; i++) {
-      // Inside translucent border.
-      pathFromTiles(gs, visibleCamps[i],
-          hexHorizDistance, hexVertDistance, /*noisy*/ true, /*dashed*/ false);
-      ctx.save();
-      ctx.clip();
-      ctx.lineWidth = bold;
-      ctx.strokeStyle = 'hsla(' + campHueCreator9000(i) + ',70%,40%,0.4)';
-      ctx.stroke();
-      // Inside border.
-      ctx.lineWidth = bold / 4;
-      ctx.strokeStyle = campHsl(i, 70, 35);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    ctx.lineWidth = 1;
+  for (var i = 0; i < numberOfCamps; i++) {
+    // Background border.
+    // Mostly because Chrome's clip() pixelates.
+    pathFromTiles(gs, visibleCamps[i],
+        hexHorizDistance, hexVertDistance, /*noisy*/ true, /*dashed*/ false);
+    ctx.lineWidth = bold / 4;
+    ctx.strokeStyle = campHsl(i, 70, 35);
+    ctx.stroke();
+    // Dashed border.
+    pathFromTiles(gs, visibleCamps[i],
+        hexHorizDistance, hexVertDistance, /*noisy*/ true, /*dashed*/ true);
+    ctx.lineWidth = bold / 8;
+    ctx.strokeStyle = campHsl(i, 80, 42);
+    ctx.stroke();
   }
+
+  for (var i = 0; i < numberOfCamps; i++) {
+    // Inside translucent border.
+    pathFromTiles(gs, visibleCamps[i],
+        hexHorizDistance, hexVertDistance, /*noisy*/ true, /*dashed*/ false);
+    ctx.save();
+    ctx.clip();
+    ctx.lineWidth = bold;
+    ctx.strokeStyle = 'hsla(' + campHueCreator9000(i) + ',70%,40%,0.4)';
+    ctx.stroke();
+    // Inside border.
+    ctx.lineWidth = bold / 4;
+    ctx.strokeStyle = campHsl(i, 70, 35);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.lineWidth = 1;
 }
 
 // Return CSS hsl string.
@@ -1197,11 +1171,9 @@ function campHsl(camp, saturation, lightness) {
       + ',' + saturation + '%,' + lightness + '%)';
 }
 
-var campHue = [];
 // The name is not a joke.
 function campHueCreator9000(camp) {
-  if (campHue[camp] !== undefined) { return campColors[camp];
-  } else if (camp === 0) { return 270;
+  if (camp <= 0) { return 270;
   } else { return (campHueCreator9000(camp - 1) + 60) % 360;
   }
 }
@@ -1263,9 +1235,9 @@ function paintMessage(gs, tileKey, msg) {
 // gs is the GraphicState.
 function paintTileMessages(gs) {
   var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
-  for (var tileKey in warTiles) {
-    paintMessage(gs, tileKey, warTiles[tileKey].message);
-  }
+  //for (var tileKey in warTiles) {
+  //  paintMessage(gs, tileKey, warTiles[tileKey].message);
+  //}
 }
 
 
@@ -1334,33 +1306,14 @@ window.onkeydown = function keyInputManagement(event) {
 
 // Selection.
 
+// Map from tileKey to camp index.
+var accessibleTiles;
+var currentTile;  // {q,r}
 
 function mouseSelection(event) {
   gs.canvas.removeEventListener('mousemove', mouseDrag);
   gs.canvas.removeEventListener('mouseup', mouseSelection);
-  var posTile = tileFromPixel({ x: event.clientX, y: event.clientY },
-        gs.origin, gs.hexSize);
-
-  // Move there.
-  currentTile = posTile;
-  updateCurrentTileInformation();
-  paint(gs);
 };
-
-var mousePosition;
-var targetTile;
-function showPath(event) {
-  mousePosition = { x: event.clientX, y: event.clientY };
-  if (currentTile &&
-      (selectionMode === selectionModes.travel ||
-       selectionMode === selectionModes.split)) {
-    targetTile = tileFromPixel(mousePosition, gs.origin, gs.hexSize);
-    paint(gs);
-    paintHumans(gs, humanityData);
-  }
-}
-//canvas.addEventListener('mousemove', showPath);
-
 
 // Map dragging.
 
@@ -1387,6 +1340,12 @@ function mouseEndDrag(event) {
 }
 
 gs.canvas.onmousedown = function mouseInputManagement(event) {
+  showTitleScreen = false;
+  var posTile = tileFromPixel(pixelFromClient(event), gs.origin, gs.hexSize);
+  // Move there.
+  currentTile = posTile;
+  paint(gs);
+
   if (event.button === 0) {
     gs.canvas.addEventListener('mouseup', mouseSelection);
     gs.canvas.addEventListener('mousemove', mouseDrag);
@@ -1418,8 +1377,6 @@ function dragMap(event) {
   drawingWhileDragging = true;
   var velocityX = (lastMousePosition.clientX - event.clientX);
   var velocityY = (lastMousePosition.clientY - event.clientY);
-  gs.origin.x0 += velocityX;
-  gs.origin.y0 += velocityY;
   // Save the last mouse position.
   lastMousePosition.clientX = event.clientX;
   lastMousePosition.clientY = event.clientY;

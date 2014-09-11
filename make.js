@@ -8,8 +8,8 @@ var uglify = require('uglify-js');
 
 var debug = !!process.argv[2] || false;
 
-function bundle(file, inputs, compress) {
-  compress = !!compress;
+function bundle(file, inputs, options) {
+  options = options || {};
   var output = fs.createWriteStream(file);
 
   function cat(i) {
@@ -24,10 +24,16 @@ function bundle(file, inputs, compress) {
       }
     });
   }
-  if (!compress || debug) {  // do not minify the code.
+  if (debug) {  // do not minify the code.
     cat(0);
   } else {
-    var minified = uglify.minify(inputs);
+    var total = inputs.map(function(filename) {
+      return fs.readFileSync(filename);
+    }).reduce(function(acc, next) { return acc + next; });
+    if (options.closure) {
+      total = '(function(){' + total + '}())';
+    }
+    var minified = uglify.minify(total, { fromString: true });
     output.write(minified.code, function(){});
   }
 }
@@ -41,8 +47,16 @@ function union(lists) {
   return ulist;
 }
 
+var stream = require('stream');
+function streamFromString(str) {
+  var newStream = new stream.Readable();
+  newStream._read = function() { newStream.push(str); newStream.push(null); };
+  return newStream;
+}
+
 bundle('.js', [
   'terrain.js',
   'graphics.js',
   'engine.js',
-], true);
+  'ui.js',
+], { closure: true });
