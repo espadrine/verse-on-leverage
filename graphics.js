@@ -79,8 +79,8 @@ function pixelFromTile(p, px0, size) {
 function noisyPixel(size, tile) {
   var t = terrain.tile(tile);
   var c = { x: 0, y: 0 };
-  c.x += (tile.q ^ tile.r ^ t.a) % size;
-  c.y +=  (tile.q ^ tile.r ^ t.a) % size;
+  c.x += (t.a * size);
+  c.y +=  (t.a * size);
   return c;
 }
 
@@ -279,7 +279,7 @@ function pointFromVertex(gs, vertex, hexHorizDistance, noisy) {
   var cy = cp.y|0;
   var halfHorizDistance = hexHorizDistance/2|0;
   var halfSize = size/2|0;
-  var ncx = noisy? noisyPixel(size / 2, tile): {x:0, y:0};
+  var ncx = noisy? noisyPixel(size, tile): {x:0, y:0};
   if (vertexSide === 0) {
     return { x: cx + halfHorizDistance + ncx.x, y: cy + halfSize + ncx.y };
   } else if (vertexSide === 1) {
@@ -555,6 +555,106 @@ function paintTilesRaw(gs, end) {
   });
 }
 
+// List of {q,r} tiles on the screen.
+var visibleTiles = [];
+function getVisibleTiles(gs) {
+  if (visibleTiles.length > 0) { return visibleTiles; }
+  var width = gs.width;
+  var height = gs.height;
+  // The `origin` {x0, y0} is the position of the top left pixel on the screen,
+  // compared to the pixel (0, 0) on the map.
+  var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
+  // This is a jigsaw. We want the corner tiles of the screen.
+  var tilePos = tileFromPixel({ x:0, y:0 }, origin, size);
+  var centerPixel = pixelFromTile({ q: tilePos.q, r: tilePos.r-1 },
+    origin, size);
+  var cx = centerPixel.x;
+  var cy = centerPixel.y;
+  var hexHorizDistance = size * Math.sqrt(3);
+  var hexVertDistance = size * 3/2;
+
+  for (var i = 0; i < 9; i++) {
+    var offLeft = true;     // Each row is offset from the row above.
+    var cx = centerPixel.x;
+    var cy = centerPixel.y;
+    while (cy - hexVertDistance < height) {
+      while (cx - hexHorizDistance < width) {
+        tilePos = tileFromPixel({ x:cx, y:cy }, origin, size);
+        visibleTiles.push(tilePos);
+        cx += hexHorizDistance;
+      }
+      cy += hexVertDistance;
+      cx = centerPixel.x;
+      if (offLeft) {
+        cx -= hexHorizDistance / 2;   // This row is offset.
+        offLeft = false;
+      } else {
+        offLeft = true;
+      }
+      cx = cx|0;
+      cy = cy|0;
+    }
+  }
+  return visibleTiles;
+}
+
+// Paint all map with…
+function paintEarth(gs) {
+  gs.ctx.fillStyle = '#7a4';
+  gs.ctx.fill();
+}
+function paintFire(gs) {
+  gs.ctx.fillStyle = '#b94';
+  gs.ctx.fill();
+}
+function paintAir(gs) {
+  gs.ctx.fillStyle = '#974';
+  gs.ctx.fill();
+}
+function paintWater(gs) {
+  gs.ctx.fillStyle = '#44a';
+  gs.ctx.fill();
+}
+
+// Paint on a canvas with smoothed hexagonal tiles.
+// gs is the GraphicState.
+function paintTilesSmooth(gs, end) {
+  var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
+  var hexHorizDistance = size * Math.sqrt(3);
+  var hexVertDistance = size * 3/2;
+  getVisibleTiles(gs);
+
+  var painterFromTileType = [];
+  painterFromTileType[element.earth] = paintEarth;
+  painterFromTileType[element.fire] = paintFire;
+  painterFromTileType[element.air] = paintAir;
+  painterFromTileType[element.water] = paintWater;
+
+  for (var tileType = 0; tileType < 4; tileType++) {
+    var tiles = Object.create(null);
+    // Add all tiles of that type.
+    for (var i = 0; i < visibleTiles.length; i++) {
+      var tile = visibleTiles[i];
+      var t = terrain.tile(tile);
+      if (t.t >= tileType) {
+        tiles[terrain.keyFromTile(tile)] = true;
+      }
+    }
+    pathFromTiles(gs, tiles, hexHorizDistance, hexVertDistance, /*noisy*/ true);
+
+    // Paint that specific tile.
+    ctx.save();
+    ctx.clip();
+    painterFromTileType[tileType](gs);
+    ctx.restore();
+  }
+
+  paintNoise(gs, function() {
+    paintResources(gs);
+    end();
+  });
+}
+
 // Paint some random noise.
 function paintNoise(gs, end) {
   var seed = (Math.random() * 1000)|0;
@@ -627,7 +727,7 @@ function paintTilesRawCached(gs, end) {
     var gsBuffer = makeGraphicState(tilesPaintCache);
     gsBuffer.hexSize = gs.hexSize;
     gsBuffer.origin = gs.origin;
-    paintTilesRaw(gsBuffer, function() {
+    paintTilesSmooth(gsBuffer, function() {
       gs.ctx.drawImage(tilesPaintCache, 0, 0);
       end();
     });

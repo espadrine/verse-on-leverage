@@ -1,8 +1,8 @@
 var element = {
-  earth: 0,
+  water: 0,
   fire: 1,
-  air: 2,
-  water: 3
+  earth: 2,
+  air: 3
 };
 
 var MAX_INT = 9007199254740992;
