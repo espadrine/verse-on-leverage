@@ -63,8 +63,109 @@ Terrain.prototype = {
     return { q: values[0]|0, r: values[1]|0 };
   },
 
+  // Return the accessible tiles from a certain spot,
+  // as a map from "q:r" to truthy values.
   accessibleTiles: function(tile) {
     var terrainTile = this.tile(tile);
+    var nextTiles = Object.create(null);
+    if (terrainTile.t === element.earth) {
+      // All neighbors.
+      for (var i = 0; i < 6; i++) {
+        var neighbor = this.neighborFromTile(tile, i);
+        nextTiles[this.keyFromTile(neighbor)] = true;
+      }
+
+    } else if (terrainTile.t === element.fire) {
+      //  V
+      // . .
+      var neighbor = this.neighborFromTile(tile, 1);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+      neighbor = this.neighborFromTile(neighbor, 1);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+
+      neighbor = this.neighborFromTile(tile, 2);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+      neighbor = this.neighborFromTile(neighbor, 2);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+
+      neighbor = this.neighborFromTile(tile, 5);
+      neighbor = this.neighborFromTile(neighbor, 5);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+
+      neighbor = this.neighborFromTile(tile, 4);
+      neighbor = this.neighborFromTile(neighbor, 4);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+
+    } else if (terrainTile.t === element.air) {
+      var neighbor = this.neighborFromTile(tile, 1);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+      neighbor = this.neighborFromTile(neighbor, 0);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+
+      neighbor = this.neighborFromTile(tile, 5);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+      neighbor = this.neighborFromTile(neighbor, 4);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+
+      neighbor = this.neighborFromTile(tile, 3);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+      neighbor = this.neighborFromTile(neighbor, 2);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+
+    } else if (terrainTile.t === element.water) {
+      //  .
+      // ---
+      //  .
+      var neighbor = this.neighborFromTile(tile, 0);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+      neighbor = this.neighborFromTile(neighbor, 0);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+
+      neighbor = this.neighborFromTile(tile, 3);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+      neighbor = this.neighborFromTile(neighbor, 3);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+
+      neighbor = this.neighborFromTile(tile, 1);
+      neighbor = this.neighborFromTile(neighbor, 2);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+
+      neighbor = this.neighborFromTile(tile, 5);
+      neighbor = this.neighborFromTile(neighbor, 4);
+      nextTiles[this.keyFromTile(neighbor)] = true;
+    }
+
+    for (var tileKey in nextTiles) {
+      if (!visibleTiles[tileKey]) { delete nextTiles[tileKey]; }
+    }
+
+    return nextTiles;
+  },
+
+  // Return the transition element for a particular element.
+  transitionElement: function (e) {
+    switch(e) {
+    case element.fire:  return element.air;
+    case element.air:   return element.water;
+    case element.water: return element.fire;
+    }
+  },
+
+  // Return the transition element for a particular element.
+  antiTransitionElement: function (e) {
+    switch(e) {
+    case element.fire:  return element.water;
+    case element.air:   return element.fire;
+    case element.water: return element.air;
+    }
+  },
+
+  // Return true if tile2 has the transition element of tile1.
+  // tile1, tile2: {q,r}
+  transitionTile: function (tile1, tile2) {
+    var e1 = terrain.tile(tile1).t;
+    var e2 = terrain.tile(tile2).t;
+    return e2 === this.transitionElement(e1);
   },
 
 };

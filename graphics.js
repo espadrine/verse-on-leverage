@@ -482,6 +482,29 @@ function paintAroundTiles(gs, tiles, color) {
   ctx.stroke();
 }
 
+// Paint each tile, and paint links from currentTile.
+// tiles: map from "q:r" to truthy values.
+// gs is the GraphicState.
+function paintLinkedTiles(gs, tiles) {
+  var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
+  // Show tiles controlled by a player.
+  if (currentTile != null && playerCamp != null) {
+    paintTileHexagon(gs, currentTile, campHsl(playerCamp, 50, 40), 5);
+    var from = pixelFromTile(currentTile, origin, size);
+    for (var tileKey in tiles) {
+      var to = pixelFromTile(terrain.tileFromKey(tileKey), origin, size);
+      paintMouseMovement(gs, from, to, 'rgba(200,200,200,0.5)');
+    }
+  }
+  for (var tileKey in tiles) {
+    var color = 'rgba(255,255,255,0.3)';
+    if (terrain.transitionTile(currentTile, terrain.tileFromKey(tileKey))) {
+      color = 'rgba(255,140,140,0.3)';
+    }
+    paintTileHexagon(gs, terrain.tileFromKey(tileKey), color, 5);
+  }
+}
+
 // Same as above, with the straight line algorithm.
 // gs is the GraphicState.
 function paintStraightAroundTiles(gs, tiles, color) {
@@ -764,17 +787,18 @@ function pixelFromClient(client) {
 }
 
 // gs is the GraphicState.
-function paintMouseMovement(gs) {
+// from, to: pixels {x,y} from top left of canvas.
+// color: CSS color as a string.
+function paintMouseMovement(gs, startFrom, to, color) {
+  color = color || '#333';
+  var from = { x: startFrom.x, y: startFrom.y };
   var ctx = gs.ctx;
-  var from = pixelFromTile(tileFromPixel(pixelFromClient(startMousePosition),
-        gs.origin, gs.hexSize), gs.origin, gs.hexSize);
-  var to = pixelFromClient(lastMousePosition);
   var deltaX = to.x - from.x;
   var deltaY = to.y - from.y;
   var portions = 20;
   var dx = deltaX / portions;
   var dy = deltaY / portions;
-  ctx.strokeStyle = '#333';
+  ctx.strokeStyle = color;
   ctx.lineCap = 'round';
   for (var i = 0; i < portions; i++) {
     ctx.beginPath();
@@ -800,18 +824,15 @@ setTimeout(function() { showTitleScreen = false; paint(gs); }, 8000);
 // gs is the GraphicState.
 function paintIntermediateUI(gs) {
   var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
+  // Paint the set of accessible tiles.
+  paintLinkedTiles(gs, accessibleTiles);
   if (currentlyDragging) {
-    paintMouseMovement(gs);
-  }
-  // Show tiles controlled by a player.
-  if (currentTile != null && playerCamp != null) {
-    paintTileHexagon(gs, currentTile, campHsl(playerCamp, 50, 40), 5);
+    var from = pixelFromTile(tileFromPixel(pixelFromClient(startMousePosition),
+          gs.origin, gs.hexSize), gs.origin, gs.hexSize);
+    var to = pixelFromClient(lastMousePosition);
+    paintMouseMovement(gs, from, to, '#333');
   }
   paintCamps(gs);
-  // Paint the set of accessible tiles.
-  ctx.lineWidth = 1.5;
-  paintAroundTiles(gs, accessibleTiles);
-  ctx.lineWidth = 1;
   paintTileMessages(gs);
   if (gameOver !== undefined) {
     drawTitle(gs, [
@@ -1146,11 +1167,12 @@ function paintCamps(gs) {
 // Return CSS hsl string.
 // saturation: number from 0 to 100.
 // lightness: number from 0 to 100.
-function campHsl(camp, saturation, lightness) {
+function campHsl(camp, saturation, lightness, alpha) {
   if (saturation == null) { saturation = 100; }
   if (lightness == null) { lightness = 45; }
-  return 'hsl(' + campHueCreator9000(camp)
-      + ',' + saturation + '%,' + lightness + '%)';
+  if (alpha == null) { alpha = 1; }
+  return 'hsla(' + campHueCreator9000(camp)
+      + ',' + saturation + '%,' + lightness + '%,' + alpha + ')';
 }
 
 // The name is not a joke.
@@ -1326,6 +1348,7 @@ gs.canvas.onmousedown = function mouseInputManagement(event) {
   var posTile = tileFromPixel(pixelFromClient(event), gs.origin, gs.hexSize);
   // Move there.
   currentTile = posTile;
+  accessibleTiles = terrain.accessibleTiles(currentTile);
   paint(gs);
 
   if (event.button === 0) {
