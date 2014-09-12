@@ -1506,7 +1506,15 @@ function Camp() {
   campCursorId++;
   // Find a starting location.
   var earthTiles = visibleTilesFilter(function(tile, terrainTile) {
-    return terrainTile.t === element.earth && terrainTile.c === (void 0);
+    var earth = terrainTile.t === element.earth;
+    var notEnemy = terrainTile.c === (void 0);
+    var nextToResource = false;
+    for (var i = 0; i < 6; i++) {
+      var neighbor = terrain.neighborFromTile(tile, i);
+      if (!visibleTiles[terrain.keyFromTile(tile)]) { continue; }
+      if (terrain.tile(neighbor).r) { nextToResource = true; break; }
+    }
+    return earth && notEnemy && nextToResource;
   });
   this.baseTile = earthTiles[(Math.random() * earthTiles.length)|0];
   // Give this tile to us!
