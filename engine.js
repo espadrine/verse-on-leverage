@@ -8,12 +8,12 @@ var playerCamp = 0;
 // (see `terrain.js`).
 // Returns a list of {q,r}.
 function visibleTilesFilter(valid) {
-  getVisibleTiles(gs);
   var tiles = [];
-  for (var i = 0; i < visibleTiles.length; i++) {
-    var terrainTile = terrain.tile(visibleTiles[i]);
-    if (valid(visibleTiles[i], terrainTile)) {
-      tiles.push(visibleTiles[i]);
+  for (var tileKey in visibleTiles) {
+    var tile = terrain.tileFromKey(tileKey);
+    var terrainTile = terrain.tile(tile);
+    if (valid(tile, terrainTile)) {
+      tiles.push(tile);
     }
   }
   return tiles;
@@ -24,7 +24,6 @@ function Camp() {
   this.id = campCursorId;
   campCursorId++;
   // Find a starting location.
-  getVisibleTiles(gs);
   var earthTiles = visibleTilesFilter(function(tile, terrainTile) {
     return terrainTile.t === element.earth && terrainTile.c === (void 0);
   });
@@ -36,6 +35,10 @@ function Camp() {
 }
 Camp.prototype = {
   id: 0,
+  // {q,r} tile location of the camp's base.
+  baseTile: null,
+  // Number of resources obtained.
+  resources: 0,
 }
 
 // Object containing:
@@ -44,7 +47,6 @@ Camp.prototype = {
 var gameOver;
 
 function GameState() {
-  terrain = new Terrain();
   this.camps = new Array(numberOfCamps);
   for (var i = 0; i < numberOfCamps; i++) {
     this.camps[i] = new Camp();
@@ -58,6 +60,11 @@ var gameState;
 
 // Set up a new game.
 function setUpGame() {
+  terrain = new Terrain();
+  allTiles = null;
+  visibleTiles = null;
+  computeVisibleTiles(gs);
+
   campCursorId = 0;
   gameState = new GameState();
   paint(gs);

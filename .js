@@ -61,7 +61,11 @@ Terrain.prototype = {
   tileFromKey: function tileFromKey(key) {
     var values = key.split(':');
     return { q: values[0]|0, r: values[1]|0 };
-  }
+  },
+
+  accessibleTiles: function(tile) {
+    var terrainTile = this.tile(tile);
+  },
 
 };
 
@@ -620,11 +624,13 @@ function paintTilesRaw(gs, end) {
   });
 }
 
-// List of {q,r} tiles on the screen.
-var allTiles = [];
-var visibleTiles = [];
-function getVisibleTiles(gs) {
-  if (visibleTiles.length > 0) { return visibleTiles; }
+// Map from "q:r" tiles on the screen to truthy values.
+var allTiles = null
+var visibleTiles = null;
+function computeVisibleTiles(gs) {
+  if (visibleTiles !== null) { return; }
+  allTiles = Object.create(null);
+  visibleTiles = Object.create(null);
   var width = gs.width;
   var height = gs.height;
   // The `origin` {x0, y0} is the position of the top left pixel on the screen,
@@ -645,10 +651,10 @@ function getVisibleTiles(gs) {
   while (cy - hexVertDistance < height) {
     while (cx - hexHorizDistance < width) {
       tilePos = tileFromPixel({ x:cx, y:cy }, origin, size);
-      allTiles.push(tilePos);
+      allTiles[terrain.keyFromTile(tilePos)] = true;
       if ((cx - hexHorizDistance/2 > 0) && (cx + hexHorizDistance/2 < gs.width)
         &&(cy - hexVertDistance/2 > 0) && (cy + hexVertDistance/2 < gs.height)) {
-        visibleTiles.push(tilePos);
+        visibleTiles[terrain.keyFromTile(tilePos)] = true;
       }
       cx += hexHorizDistance;
     }
@@ -663,7 +669,6 @@ function getVisibleTiles(gs) {
     cx = cx|0;
     cy = cy|0;
   }
-  return visibleTiles;
 }
 
 // Paint all map with…
@@ -690,7 +695,6 @@ function paintTilesSmooth(gs, end) {
   var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
   var hexHorizDistance = size * Math.sqrt(3);
   var hexVertDistance = size * 3/2;
-  getVisibleTiles(gs);
 
   var painterFromTileType = [];
   painterFromTileType[element.earth] = paintEarth;
@@ -701,11 +705,11 @@ function paintTilesSmooth(gs, end) {
   for (var tileType = 0; tileType < 4; tileType++) {
     var tiles = Object.create(null);
     // Add all tiles of that type.
-    for (var i = 0; i < allTiles.length; i++) {
-      var tile = allTiles[i];
+    for (var tileKey in allTiles) {
+      var tile = terrain.tileFromKey(tileKey);
       var t = terrain.tile(tile);
       if (t.t >= tileType) {
-        tiles[terrain.keyFromTile(tile)] = true;
+        tiles[tileKey] = true;
       }
     }
     pathFromTiles(gs, tiles, hexHorizDistance, hexVertDistance, /*noisy*/ true);
@@ -1153,14 +1157,13 @@ function drawShell() {
 
 // artilleryFire: map from a "q:r" target to a list of "q:r" artilleries.
 function addShells(movementAnimations, artilleryFire) {
-  getVisibleTiles(gs);
   for (var targetTileKey in artilleryFire) {
     var tileKeys = artilleryFire[targetTileKey];
     for (var i = 0; i < tileKeys.length; i++) {
       var tileKey = tileKeys[i];
       // Check that we can see it.
-      if (visibleTiles.indexOf(tileKey) >= 0
-       || visibleTiles.indexOf(targetTileKey) >= 0) {
+      if (visibleTiles[tileKey]
+       || visibleTiles[targetTileKey]) {
         var fromTile = terrain.tileFromKey(tileKey);
         var toTile = terrain.tileFromKey(targetTileKey);
         var from = pixelFromTile(fromTile, gs.origin, gs.hexSize);
@@ -1181,13 +1184,13 @@ function addShells(movementAnimations, artilleryFire) {
 // gs is the GraphicState.
 function paintCamps(gs) {
   var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
-  getVisibleTiles(gs);
   var visibleCamps = new Array(numberOfCamps);
   for (var i = 0; i < numberOfCamps; i++) { visibleCamps[i] = {}; }
-  for (var i = 0; i < visibleTiles.length; i++) {
-    var humans = terrain.tile(visibleTiles[i]);
+  for (var tileKey in visibleTiles) {
+    var tile = terrain.tileFromKey(tileKey);
+    var humans = terrain.tile(tile);
     if (humans.c !== (void 0)) {
-      var cp = pixelFromTile(visibleTiles[i], gs.origin, gs.hexSize);
+      var cp = pixelFromTile(tile, gs.origin, gs.hexSize);
       var radius = 10;
 
       ctx.beginPath();
@@ -1486,12 +1489,12 @@ var playerCamp = 0;
 // (see `terrain.js`).
 // Returns a list of {q,r}.
 function visibleTilesFilter(valid) {
-  getVisibleTiles(gs);
   var tiles = [];
-  for (var i = 0; i < visibleTiles.length; i++) {
-    var terrainTile = terrain.tile(visibleTiles[i]);
-    if (valid(visibleTiles[i], terrainTile)) {
-      tiles.push(visibleTiles[i]);
+  for (var tileKey in visibleTiles) {
+    var tile = terrain.tileFromKey(tileKey);
+    var terrainTile = terrain.tile(tile);
+    if (valid(tile, terrainTile)) {
+      tiles.push(tile);
     }
   }
   return tiles;
@@ -1502,7 +1505,6 @@ function Camp() {
   this.id = campCursorId;
   campCursorId++;
   // Find a starting location.
-  getVisibleTiles(gs);
   var earthTiles = visibleTilesFilter(function(tile, terrainTile) {
     return terrainTile.t === element.earth && terrainTile.c === (void 0);
   });
@@ -1514,6 +1516,10 @@ function Camp() {
 }
 Camp.prototype = {
   id: 0,
+  // {q,r} tile location of the camp's base.
+  baseTile: null,
+  // Number of resources obtained.
+  resources: 0,
 }
 
 // Object containing:
@@ -1522,7 +1528,6 @@ Camp.prototype = {
 var gameOver;
 
 function GameState() {
-  terrain = new Terrain();
   this.camps = new Array(numberOfCamps);
   for (var i = 0; i < numberOfCamps; i++) {
     this.camps[i] = new Camp();
@@ -1536,6 +1541,11 @@ var gameState;
 
 // Set up a new game.
 function setUpGame() {
+  terrain = new Terrain();
+  allTiles = null;
+  visibleTiles = null;
+  computeVisibleTiles(gs);
+
   campCursorId = 0;
   gameState = new GameState();
   paint(gs);

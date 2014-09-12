@@ -61,7 +61,11 @@ Terrain.prototype = {
   tileFromKey: function tileFromKey(key) {
     var values = key.split(':');
     return { q: values[0]|0, r: values[1]|0 };
-  }
+  },
+
+  accessibleTiles: function(tile) {
+    var terrainTile = this.tile(tile);
+  },
 
 };
 
