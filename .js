@@ -7,11 +7,6 @@ var element = {
 
 var MAX_INT = 9007199254740992;
 
-var planTypes = {
-  move: 1,
-  build: 2
-};
-
 function Terrain() {
   this.data = {};
 }
@@ -65,6 +60,7 @@ Terrain.prototype = {
 
   // Return the accessible tiles from a certain spot,
   // as a map from "q:r" to truthy values.
+  // tile: {q,r}
   accessibleTiles: function(tile) {
     var terrainTile = this.tile(tile);
     var nextTiles = Object.create(null);
@@ -657,7 +653,7 @@ function paintAroundTiles(gs, tiles, color) {
 // Paint each tile, and paint links from currentTile.
 // tiles: map from "q:r" to truthy values.
 // gs is the GraphicState.
-function paintLinkedTiles(gs, tiles) {
+function paintSelectedTile(gs, tiles) {
   var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
   // Show tiles controlled by a player.
   if (currentTile != null && playerCamp != null) {
@@ -913,6 +909,20 @@ function paintResources(gs) {
   }
 }
 
+// gs is the GraphicState.
+function paintLinks(gs) {
+  for (var tileKey in visibleTiles) {
+    var tile = terrain.tileFromKey(tileKey);
+    var terrainTile = terrain.tile(tile);
+    var from = pixelFromTile(tile, gs.origin, gs.hexSize);
+    for (var i = 0; i < terrainTile.n.length; i++) {
+      var next = terrainTile.n[i];
+      var to = pixelFromTile(terrain.tileFromKey(next), gs.origin, gs.hexSize);
+      paintMouseMovement(gs, from, to, campHsl(terrainTile.c, 50, 40));
+    }
+  }
+}
+
 var tilesPaintCache;
 
 function paintTilesRawCached(gs, end) {
@@ -996,8 +1006,9 @@ setTimeout(function() { showTitleScreen = false; paint(gs); }, 8000);
 // gs is the GraphicState.
 function paintIntermediateUI(gs) {
   var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
+  paintLinks(gs);
   // Paint the set of accessible tiles.
-  paintLinkedTiles(gs, accessibleTiles);
+  paintSelectedTile(gs, accessibleTiles);
   if (currentlyDragging) {
     var from = pixelFromTile(tileFromPixel(pixelFromClient(startMousePosition),
           gs.origin, gs.hexSize), gs.origin, gs.hexSize);
@@ -1328,10 +1339,11 @@ function paintCamps(gs) {
       ctx.stroke();
 
       ctx.font = radius + 'px sans-serif';
+      ctx.textAlign = 'center';
       ctx.fillStyle = 'white';
       var power = '' + humans.p;
       var powerSize = ctx.measureText(power).width;
-      ctx.fillText(power, cp.x - powerSize / 2, cp.y + radius / 4);
+      ctx.fillText(power, cp.x, cp.y + radius / 4);
     }
   }
 }
@@ -1485,6 +1497,7 @@ window.onkeydown = function keyInputManagement(event) {
 // Map from tileKey to camp index.
 var accessibleTiles;
 var currentTile;  // {q,r}
+var targetTile;
 
 function mouseSelection(event) {
   gs.canvas.removeEventListener('mousemove', mouseDrag);
@@ -1509,10 +1522,16 @@ function mouseEndDrag(event) {
   gs.canvas.removeEventListener('mousemove', dragMap);
   gs.canvas.removeEventListener('mouseup', mouseEndDrag);
   currentlyDragging = false;
-  paint(gs);
   clearInterval(dragVelTo);
   computeDragVelocity();
   inertiaDragMap();
+
+  gameState.move({
+    type: planType.move,
+    at: terrain.keyFromTile(currentTile),
+    to: terrain.keyFromTile(targetTile),
+  });
+  paint(gs);
 }
 
 gs.canvas.onmousedown = function mouseInputManagement(event) {
@@ -1533,7 +1552,6 @@ gs.canvas.onmousedown = function mouseInputManagement(event) {
   } else if (event.button === 2) {
     // FIXME: Direct move.
     mouseSelection(event);
-    enterNormalMode();
   }
 };
 gs.canvas.oncontextmenu = function(e) { e.preventDefault(); };
@@ -1557,6 +1575,8 @@ function dragMap(event) {
   // Save the last mouse position.
   lastMousePosition.clientX = event.clientX;
   lastMousePosition.clientY = event.clientY;
+  targetTile = tileFromPixel(pixelFromClient(lastMousePosition),
+      gs.origin, gs.hexSize);
   paint(gs);
   requestAnimationFrame(function() {
     drawingWhileDragging = false;
@@ -1659,6 +1679,11 @@ Camp.prototype = {
 // - winType: string indicating the type of victory.
 var gameOver;
 
+var planType = {
+  move: 1,
+  build: 2
+};
+
 function GameState() {
   this.camps = new Array(numberOfCamps);
   for (var i = 0; i < numberOfCamps; i++) {
@@ -1667,6 +1692,56 @@ function GameState() {
 }
 GameState.prototype = {
   camps: [],
+  turn: 0,
+  nextTurn: function() {
+    this.turn = (this.turn + 1) % numberOfCamps;
+  },
+
+  // A move is a {type: planType, at: "q:r", to: "q:r", element}.
+  validMove: function(move) {
+    var atTile = terrain.tileFromKey(move.at);
+    var atTerrainTile = terrain.tile(atTile);
+    if (atTerrainTile.c !== this.turn) { return false; }
+    if (move.type === planType.move) {
+      if (move.to == null) { return false; }
+      // We cannot get to that parcel.
+      if (!terrain.accessibleTiles(atTile)[move.to]) { return false; }
+      // The connection is already set.
+      if (atTerrainTile.n.indexOf(move.to) >= 0) { return false; }
+      // The connection is already set the other way around.
+      var toTile = terrain.tileFromKey(move.to);
+      var toTerrainTile = terrain.tile(toTile);
+      if (toTerrainTile.n.indexOf(move.at) >= 0) { return false; }
+    } else if (move.type === planType.build) {
+      if (planType.element == null) { return false; }
+      if (planType.element < 0 || planType.element > 3) { return false; }
+      // There already is a fortification.
+      if (atTerrainTile.f != null) { return false; }
+    } else { return false; }
+    return true;
+  },
+
+  // A move is a {type: planType, at: "q:r", to: "q:r", element}.
+  move: function(move) {
+    if (this.validMove(move)) {
+      var atTile = terrain.tileFromKey(move.at);
+      var atTerrainTile = terrain.tile(atTile);
+      if (move.type === planType.move) {
+        atTerrainTile.n.push(move.to);
+        var toTile = terrain.tileFromKey(move.to);
+        var toTerrainTile = terrain.tile(toTile);
+        toTerrainTile.c = this.turn;
+        toTerrainTile.p = atTerrainTile.p;
+        if (terrain.transitionTile(atTile, toTile)) {
+          toTerrainTile.p++;
+        }
+      } else if (move.type === planType.build) {
+        atTerrainTile.f = move.element;
+      }
+
+      this.nextTurn();
+    } else { debugger; }
+  },
 };
 
 var gameState;

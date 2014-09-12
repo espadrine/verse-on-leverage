@@ -7,11 +7,6 @@ var element = {
 
 var MAX_INT = 9007199254740992;
 
-var planTypes = {
-  move: 1,
-  build: 2
-};
-
 function Terrain() {
   this.data = {};
 }
@@ -65,6 +60,7 @@ Terrain.prototype = {
 
   // Return the accessible tiles from a certain spot,
   // as a map from "q:r" to truthy values.
+  // tile: {q,r}
   accessibleTiles: function(tile) {
     var terrainTile = this.tile(tile);
     var nextTiles = Object.create(null);
