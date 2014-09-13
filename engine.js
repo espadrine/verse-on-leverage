@@ -64,12 +64,20 @@ function GameState() {
   for (var i = 0; i < numberOfCamps; i++) {
     this.camps[i] = new Camp();
   }
+  for (var tileKey in visibleTiles) {
+    if (terrain.tile(terrain.keyFromTile(tileKey))) {
+      this.resources++;
+    }
+  }
 }
 GameState.prototype = {
   camps: [],
   turn: 0,
+  resources: 0,
   nextTurn: function() {
     this.turn = (this.turn + 1) % numberOfCamps;
+    // Is the game won?
+    this.checkWinConditions();
   },
 
   // A move is a {type: planType, at: "q:r", to: "q:r", element}.
@@ -126,8 +134,14 @@ GameState.prototype = {
           // Block secondary tiles.
           for (var i = 0; i < path.length - 1; i++) {
             var pathTerrainTile = terrain.tile(terrain.tileFromKey(path[i]));
+            if (pathTerrainTile.c !== this.turn) {
+              this.camps[this.turn].resources++;
+            }
             pathTerrainTile.c = this.turn;
             pathTerrainTile.p = 0;
+          }
+          if (toTerrainTile.c !== this.turn) {
+            this.camps[this.turn].resources++;
           }
           toTerrainTile.c = this.turn;
           toTerrainTile.p = atTerrainTile.p;
@@ -192,6 +206,46 @@ GameState.prototype = {
         terrainTile.n.splice(index, 1);
       }
     }
+  },
+
+  checkWinConditions: function() {
+    var self = this;
+    for (var i = 0; i < numberOfCamps; i++) {
+      // Is there a camp without locations?
+      if (this.countCampLocations(i) <= 0) {
+        return gameOver = {
+          winners: this.listCamps().sort(function(c1, c2) {
+            return self.countCampLocations(c2) - self.countCampLocations(c1);
+          }),
+          winType: 'Supremacy',
+        };
+      }
+      // Have we fetched half the resources?
+      if (this.camps[i].resources >= (this.resources >> 1)) {
+        return gameOver = {
+          winners: this.listCamps().sort(function(c1, c2) {
+            return self.resources(c2) - self.resources(c1);
+          }),
+          winType: 'Economy',
+        };
+      }
+    }
+  },
+
+  listCamps: function() {
+    var l = new Array(numberOfCamps);
+    for (var i = 0; i < numberOfCamps; i++) { l[i] = i; }
+    return l;
+  },
+
+  countCampLocations: function(campId) {
+    var n = 0;
+    for (var tileKey in visibleTiles) {
+      if (terrain.tile(terrain.tileFromKey(tileKey)).c === campId) {
+        n++;
+      }
+    }
+    return n;
   },
 };
 

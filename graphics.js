@@ -877,7 +877,7 @@ function paintIntermediateUI(gs) {
   }
   if (showTitleScreen) {
     drawTitle(gs, ["Welcome to Thaddée Tyl's…", "A Verse On Leverage",
-        "Give me a lever long enough; I shall lift the universe!"]);
+        "Give me a lever long enough; I shall lift the universe!"], 'silver');
   }
   displayedPaintContext.drawImage(canvas, 0, 0);
 }
