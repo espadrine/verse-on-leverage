@@ -85,7 +85,7 @@ function GameState() {
     this.camps[i] = new Camp();
   }
   for (var tileKey in visibleTiles) {
-    if (terrain.tile(terrain.keyFromTile(tileKey))) {
+    if (terrain.tile(terrain.tileFromKey(tileKey)).r) {
       this.resources++;
     }
   }
@@ -254,11 +254,17 @@ GameState.prototype = {
       if (this.camps[i].resources >= (this.resources >> 1)) {
         return gameOver = {
           winners: this.listCamps().sort(function(c1, c2) {
-            return self.resources(c2) - self.resources(c1);
+            return self.camps[c2].resources - self.camps[c1].resources;
           }),
-          winType: 'Economy',
+          winType: 'Economic',
         };
       }
+    }
+    if (gameOver != null && gameOver.winners[0] === playerCamp) {
+      if (!localStorage.getItem('gamesWon')) {
+        localStorage.setItem('gamesWon', 0);
+      }
+      localStorage.setItem('gamesWon', (+localStorage.getItem('gamesWon'))+1);
     }
   },
 
