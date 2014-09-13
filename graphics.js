@@ -489,7 +489,7 @@ function paintSelectedTile(gs, tiles) {
   var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
   // Show tiles controlled by a player.
   if (currentTile != null && playerCamp != null) {
-    paintTileHexagon(gs, currentTile, campHsl(playerCamp, 50, 40), 5);
+    paintTileHexagon(gs, currentTile, campHsl(gameState.turn, 50, 40), 5);
     var from = pixelFromTile(currentTile, origin, size);
     for (var tileKey in tiles) {
       var to = pixelFromTile(terrain.tileFromKey(tileKey), origin, size);
@@ -744,14 +744,30 @@ function paintResources(gs) {
 // gs is the GraphicState.
 function paintLinks(gs) {
   for (var tileKey in visibleTiles) {
-    var tile = terrain.tileFromKey(tileKey);
-    var terrainTile = terrain.tile(tile);
-    var from = pixelFromTile(tile, gs.origin, gs.hexSize);
-    for (var i = 0; i < terrainTile.n.length; i++) {
-      var next = terrainTile.n[i];
-      var to = pixelFromTile(terrain.tileFromKey(next), gs.origin, gs.hexSize);
-      paintMouseMovement(gs, from, to, campHsl(terrainTile.c, 50, 40));
-    }
+    paintLink(gs, tileKey);
+  }
+}
+
+// tileKey: "q:r".
+function paintLink(gs, tileKey) {
+  var ctx = gs.ctx;
+  var tile = terrain.tileFromKey(tileKey);
+  var terrainTile = terrain.tile(tile);
+  var from = pixelFromTile(tile, gs.origin, gs.hexSize);
+  for (var i = 0; i < terrainTile.n.length; i++) {
+    var next = terrainTile.n[i];
+    var to = pixelFromTile(terrain.tileFromKey(next), gs.origin, gs.hexSize);
+    var campColor = campHsl(terrainTile.c, 50, 40);
+    paintMouseMovement(gs, from, to, campColor);
+    ctx.setLineDash([2, 10]);
+    ctx.lineDashOffset = marchingAnts;
+    ctx.beginPath();
+    ctx.moveTo(to.x, to.y);
+    ctx.lineTo(from.x, from.y);
+    ctx.strokeStyle = campColor;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 }
 
@@ -782,7 +798,6 @@ function paint(gs) {
   paintTilesRawCached(gs, function(){
     paintIntermediateUI(gs);
   });
-  paintIntermediateUI(gs);
 }
 
 // Top left pixel of the canvas related to the window.
@@ -803,9 +818,8 @@ function pixelFromClient(client) {
 // gs is the GraphicState.
 // from, to: pixels {x,y} from top left of canvas.
 // color: CSS color as a string.
-function paintMouseMovement(gs, startFrom, to, color) {
+function paintMouseMovement(gs, from, to, color) {
   color = color || '#333';
-  var from = { x: startFrom.x, y: startFrom.y };
   var ctx = gs.ctx;
   var deltaX = to.x - from.x;
   var deltaY = to.y - from.y;
@@ -814,12 +828,14 @@ function paintMouseMovement(gs, startFrom, to, color) {
   var dy = deltaY / portions;
   ctx.strokeStyle = color;
   ctx.lineCap = 'round';
+  var fromx = from.x;
+  var fromy = from.y;
   for (var i = 0; i < portions; i++) {
     ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    from.x += dx;
-    from.y += dy;
-    ctx.lineTo(from.x, from.y);
+    ctx.moveTo(fromx, fromy);
+    fromx += dx;
+    fromy += dy;
+    ctx.lineTo(fromx, fromy);
     var quotient = i / portions - 0.5;
     ctx.lineWidth = 7 * (4 * quotient * quotient + 0.1);
     ctx.stroke();
@@ -1051,132 +1067,54 @@ function paintHuman(gs, shownManufacture, tile, animx, animy) {
   }
 }
 
-function animateHumans() {
-  paintHumans(gs, humanityData);
-  updateHumans();
-  paintMovementAnimations();
+var marchingAnts = 0;
+
+function animations() {
+  marchingAnts += 1;
+  if (marchingAnts >= MAX_INT) { marchingAnts = 0; }
+  paint(gs);
+  //paintHumans(gs, humanityData);
+  //updateHumans();
 }
-//var humanAnimationTimeout = setInterval(animateHumans, 100);
-
-// from:{x,y}, to:{x,y}, velocity, drawFunction: function(){}.
-function InterpolationAnimation(gs, from, to, velocity, drawFunction) {
-  this.gs = gs;
-  this.from = from; this.to = to;
-  this.pos = { x: this.from.x, y: this.from.y };
-  this.velocity = velocity;
-  this.deltaX = to.x - from.x;
-  this.deltaY = to.y - from.y;
-  this.length =
-    Math.sqrt(this.deltaX * this.deltaX + this.deltaY * this.deltaY);
-  this.portions = this.length / velocity;
-  this.usedPortions = 0;
-  this.dx = this.deltaX / this.portions;
-  this.dy = this.deltaY / this.portions;
-  this.normalizedDx = this.deltaX / this.length;
-  this.normalizedDy = this.deltaY / this.length;
-  this.drawFunction = drawFunction;
-}
-InterpolationAnimation.prototype = {
-  draw: function() {
-    this.drawFunction();
-    this.pos.x += this.dx;
-    this.pos.y += this.dy;
-    this.usedPortions++;
-    // If we're past our final location, we clear this up.
-    if (this.usedPortions > this.portions) {
-      var animationIndex = movementAnimations.indexOf(this);
-      movementAnimations.splice(animationIndex, 1);
-    }
-  }
-};
-
-function paintMovementAnimations() {
-  for (var i = 0; i < movementAnimations.length; i++) {
-    movementAnimations[i].draw();
-  }
-}
-
-// List of InterpolationAnimation instances.
-var movementAnimations = [];
-var animationVelocity = 32; // pixels
-
-function drawShell() {
-  var ctx = this.gs.ctx;
-  ctx.lineWidth = 2;
-  var segments = Math.min(this.usedPortions, 8);
-  var x = this.pos.x;
-  var y = this.pos.y;
-  var segmentSize = 4; // pixels
-  var incrx = segmentSize * this.normalizedDx;
-  var incry = segmentSize * this.normalizedDy;
-  for (var i = 9; i > (8 - segments); i--) {
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    x -= incrx;
-    y -= incry;
-    ctx.lineTo(x, y);
-    ctx.strokeStyle = 'rgba(0,0,0,0.' + i + ')';
-    ctx.stroke();
-  }
-}
-
-// artilleryFire: map from a "q:r" target to a list of "q:r" artilleries.
-function addShells(movementAnimations, artilleryFire) {
-  for (var targetTileKey in artilleryFire) {
-    var tileKeys = artilleryFire[targetTileKey];
-    for (var i = 0; i < tileKeys.length; i++) {
-      var tileKey = tileKeys[i];
-      // Check that we can see it.
-      if (visibleTiles[tileKey]
-       || visibleTiles[targetTileKey]) {
-        var fromTile = terrain.tileFromKey(tileKey);
-        var toTile = terrain.tileFromKey(targetTileKey);
-        var from = pixelFromTile(fromTile, gs.origin, gs.hexSize);
-        var to = pixelFromTile(toTile, gs.origin, gs.hexSize);
-        var shellAnimation = new InterpolationAnimation(
-          gs, from, to, animationVelocity, drawShell
-        );
-        movementAnimations.push(shellAnimation);
-      }
-    }
-  }
-}
-
+var animationTimeout = setInterval(animations, 200);
 
 
 
 
 // gs is the GraphicState.
 function paintCamps(gs) {
-  var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
-  var visibleCamps = new Array(numberOfCamps);
-  for (var i = 0; i < numberOfCamps; i++) { visibleCamps[i] = {}; }
   for (var tileKey in visibleTiles) {
-    var tile = terrain.tileFromKey(tileKey);
-    var humans = terrain.tile(tile);
-    if (humans.c !== (void 0)) {
-      var cp = pixelFromTile(tile, gs.origin, gs.hexSize);
-      var radius = 10;
+    paintCampLocation(gs, tileKey);
+  }
+}
 
-      ctx.beginPath();
-      ctx.arc(cp.x, cp.y, radius, 0, 2*Math.PI, true);
-      ctx.closePath();
-      ctx.fillStyle = campHsl(humans.c, 50, 40);
-      ctx.fill();
+// tileKey: "q:r".
+function paintCampLocation(gs, tileKey) {
+  var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
+  var tile = terrain.tileFromKey(tileKey);
+  var humans = terrain.tile(tile);
+  if (humans.c !== (void 0) && humans.p > 0) {
+    var cp = pixelFromTile(tile, gs.origin, gs.hexSize);
+    var radius = 10;
 
-      ctx.beginPath();
-      ctx.arc(cp.x, cp.y, radius - 2, 0, 2*Math.PI, true);
-      ctx.closePath();
-      ctx.strokeStyle = 'white';
-      ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cp.x, cp.y, radius, 0, 2*Math.PI, true);
+    ctx.closePath();
+    ctx.fillStyle = campHsl(humans.c, 50, 40);
+    ctx.fill();
 
-      ctx.font = radius + 'px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = 'white';
-      var power = '' + humans.p;
-      var powerSize = ctx.measureText(power).width;
-      ctx.fillText(power, cp.x, cp.y + radius / 4);
-    }
+    ctx.beginPath();
+    ctx.arc(cp.x, cp.y, radius - 2, 0, 2*Math.PI, true);
+    ctx.closePath();
+    ctx.strokeStyle = 'white';
+    ctx.stroke();
+
+    ctx.font = radius + 'px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'white';
+    var power = '' + humans.p;
+    var powerSize = ctx.measureText(power).width;
+    ctx.fillText(power, cp.x, cp.y + radius / 4);
   }
 }
 
@@ -1193,8 +1131,8 @@ function campHsl(camp, saturation, lightness, alpha) {
 
 // The name is not a joke.
 function campHueCreator9000(camp) {
-  if (camp <= 0) { return 270;
-  } else { return (campHueCreator9000(camp - 1) + 60) % 360;
+  if (camp > 0) { return (campHueCreator9000(camp - 1) + 60) % 360;
+  } else { return 270;
   }
 }
 

@@ -22,6 +22,7 @@ Terrain.prototype = {
   // - r: resource (boolean).
   // - f: fortification (see `element`). (Can be undefined.)
   // - n: next parcels connected to this one (as a list of "q:r").
+  // - v: next visible parcels connected to this one (as a list of "q:r").
   // - a: random number between 0 and 1.
   tile: function tile(coord) {
     var key = this.keyFromTile(coord);
@@ -32,6 +33,7 @@ Terrain.prototype = {
         a: Math.random(),
         p: 0,
         n: [],
+        v: [],
       };
     }
     return this.data[key];
@@ -59,80 +61,125 @@ Terrain.prototype = {
   },
 
   // Return the accessible tiles from a certain spot,
-  // as a map from "q:r" to truthy values.
+  // as a map from "q:r" to a list of "q:r" tiles it would occupy.
+  // True if visible, false if hidden.
   // tile: {q,r}
   accessibleTiles: function(tile) {
     var terrainTile = this.tile(tile);
     var nextTiles = Object.create(null);
+
+    // Is this tile acceptable?
+    if (terrainTile.c == null) {
+      // FIXME: maybe show tiles that lead to this one.
+      return nextTiles;
+    }
+    if (terrainTile.p <= 0) { return nextTiles; }
+
+    var tileKey;
     if (terrainTile.t === element.earth) {
       // All neighbors.
       for (var i = 0; i < 6; i++) {
         var neighbor = this.neighborFromTile(tile, i);
-        nextTiles[this.keyFromTile(neighbor)] = true;
+        tileKey = this.keyFromTile(neighbor);
+        nextTiles[tileKey] = [tileKey];
       }
 
     } else if (terrainTile.t === element.fire) {
       //  V
       // . .
       var neighbor = this.neighborFromTile(tile, 1);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      var prevTileKey = this.keyFromTile(neighbor);
+      nextTiles[prevTileKey] = [prevTileKey];
       neighbor = this.neighborFromTile(neighbor, 1);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      tileKey = this.keyFromTile(neighbor);
+      nextTiles[tileKey] = [prevTileKey, tileKey];
 
       neighbor = this.neighborFromTile(tile, 2);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      var prevTileKey = this.keyFromTile(neighbor);
+      nextTiles[prevTileKey] = [prevTileKey];
       neighbor = this.neighborFromTile(neighbor, 2);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      tileKey = this.keyFromTile(neighbor);
+      nextTiles[tileKey] = [prevTileKey, tileKey];
 
       neighbor = this.neighborFromTile(tile, 5);
+      var prevTileKey = this.keyFromTile(neighbor);
       neighbor = this.neighborFromTile(neighbor, 5);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      tileKey = this.keyFromTile(neighbor);
+      nextTiles[tileKey] = [prevTileKey, tileKey];
 
       neighbor = this.neighborFromTile(tile, 4);
+      var prevTileKey = this.keyFromTile(neighbor);
       neighbor = this.neighborFromTile(neighbor, 4);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      tileKey = this.keyFromTile(neighbor);
+      nextTiles[tileKey] = [prevTileKey, tileKey];
 
     } else if (terrainTile.t === element.air) {
       var neighbor = this.neighborFromTile(tile, 1);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      var prevTileKey = this.keyFromTile(neighbor);
+      nextTiles[prevTileKey] = [prevTileKey];
       neighbor = this.neighborFromTile(neighbor, 0);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      tileKey = this.keyFromTile(neighbor);
+      nextTiles[tileKey] = [prevTileKey, tileKey];
 
       neighbor = this.neighborFromTile(tile, 5);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      var prevTileKey = this.keyFromTile(neighbor);
+      nextTiles[prevTileKey] = [prevTileKey];
       neighbor = this.neighborFromTile(neighbor, 4);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      tileKey = this.keyFromTile(neighbor);
+      nextTiles[tileKey] = [prevTileKey, tileKey];
 
       neighbor = this.neighborFromTile(tile, 3);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      var prevTileKey = this.keyFromTile(neighbor);
+      nextTiles[prevTileKey] = [prevTileKey];
       neighbor = this.neighborFromTile(neighbor, 2);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      tileKey = this.keyFromTile(neighbor);
+      nextTiles[tileKey] = [prevTileKey, tileKey];
 
     } else if (terrainTile.t === element.water) {
       //  .
       // ---
       //  .
       var neighbor = this.neighborFromTile(tile, 0);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      var prevTileKey = this.keyFromTile(neighbor);
+      nextTiles[prevTileKey] = [prevTileKey];
       neighbor = this.neighborFromTile(neighbor, 0);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      tileKey = this.keyFromTile(neighbor);
+      nextTiles[tileKey] = [prevTileKey, tileKey];
 
       neighbor = this.neighborFromTile(tile, 3);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      var prevTileKey = this.keyFromTile(neighbor);
+      nextTiles[prevTileKey] = [prevTileKey];
       neighbor = this.neighborFromTile(neighbor, 3);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      tileKey = this.keyFromTile(neighbor);
+      nextTiles[tileKey] = [prevTileKey, tileKey];
 
       neighbor = this.neighborFromTile(tile, 1);
+      var prevTileKey = this.keyFromTile(neighbor);
       neighbor = this.neighborFromTile(neighbor, 2);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      tileKey = this.keyFromTile(neighbor);
+      nextTiles[tileKey] = [prevTileKey, tileKey];
 
-      neighbor = this.neighborFromTile(tile, 5);
-      neighbor = this.neighborFromTile(neighbor, 4);
-      nextTiles[this.keyFromTile(neighbor)] = true;
+      neighbor = this.neighborFromTile(tile, 4);
+      var prevTileKey = this.keyFromTile(neighbor);
+      neighbor = this.neighborFromTile(neighbor, 5);
+      tileKey = this.keyFromTile(neighbor);
+      nextTiles[tileKey] = [prevTileKey, tileKey];
     }
 
-    for (var tileKey in nextTiles) {
-      if (!visibleTiles[tileKey]) { delete nextTiles[tileKey]; }
+    for (var targetTileKey in nextTiles) {
+      for (var i = 0; i < nextTiles[targetTileKey].length; i++) {
+        var tileKey = nextTiles[targetTileKey][i];
+        // External tiles or already occupied tiles are removed.
+        var tile = this.tileFromKey(tileKey);
+        var thisTerrain = this.tile(tile);
+        if (!visibleTiles[tileKey]
+         || (thisTerrain.c === terrainTile.c)
+         // Interrupted along the path.
+         || (i < nextTiles[targetTileKey].length-1 && thisTerrain.c != null)) {
+          delete nextTiles[targetTileKey];
+          break;
+        }
+      }
     }
 
     return nextTiles;
@@ -162,6 +209,21 @@ Terrain.prototype = {
     var e1 = terrain.tile(tile1).t;
     var e2 = terrain.tile(tile2).t;
     return e2 === this.transitionElement(e1);
+  },
+
+  // tile: {q,r}
+  powerAgainst: function(tile) {
+    var sum = 0;
+    var terrainTile = this.tile(tile);
+    var thisTileKey = this.keyFromTile(tile);
+    for (var tileKey in visibleTiles) {
+      var otherTerrain = this.tile(this.tileFromKey(tileKey));
+      if (otherTerrain.v.indexOf(thisTileKey) >= 0
+       && otherTerrain.c !== terrainTile.c) {
+        sum += otherTerrain.p;
+      }
+    }
+    return sum;
   },
 
 };
