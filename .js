@@ -853,21 +853,27 @@ function computeVisibleTiles(gs) {
   }
 }
 
+var colorFromElement = new Array(4);
+colorFromElement[element.earth] = '#7a4';
+colorFromElement[element.fire] = '#b94';
+colorFromElement[element.air] = '#974';
+colorFromElement[element.water] = '#44a';
+
 // Paint all map with…
 function paintEarth(gs) {
-  gs.ctx.fillStyle = '#7a4';
+  gs.ctx.fillStyle = colorFromElement[element.earth];
   gs.ctx.fill();
 }
 function paintFire(gs) {
-  gs.ctx.fillStyle = '#b94';
+  gs.ctx.fillStyle = colorFromElement[element.fire];
   gs.ctx.fill();
 }
 function paintAir(gs) {
-  gs.ctx.fillStyle = '#974';
+  gs.ctx.fillStyle = colorFromElement[element.air];
   gs.ctx.fill();
 }
 function paintWater(gs) {
-  gs.ctx.fillStyle = '#44a';
+  gs.ctx.fillStyle = colorFromElement[element.water];
   gs.ctx.fill();
 }
 
@@ -1148,68 +1154,8 @@ function drawTitle(gs, lines, color) {
   ctx.textAlign = 'start';
 }
 
-// Map from "size:q:r" places to textual information.
-var mapIndex = Object.create(null);
-
-// Insert places = {"tileKey": "Place name"} into mapIndex.
-function fillMapIndex(places) {
-  for (var tileKey in places) {
-    mapIndex['2:' + tileKey] = places[tileKey];
-  }
-}
-
-function drawMapPlaces(gs) {
-  var ctx = gs.ctx;
-  ctx.fillStyle = 'black';
-  ctx.textAlign = 'center';
-  for (var tileSizeKey in mapIndex) {
-    var e = tileSizeKey.split(':');
-    var size = +e[0];
-    var tile = { q: e[1]|0, r: e[2]|0 };
-    var pixel = pixelFromTile(tile, gs.origin, gs.hexSize);
-    var text = mapIndex[tileSizeKey];
-    ctx.font = 'italic '
-      + (gs.hexSize*size*7) + 'px "Linux Biolinum", sans-serif';
-    ctx.fillText(text, pixel.x, pixel.y - 15);
-  }
-  ctx.textAlign = 'start';
-}
-
 
 // Animations.
-
-var numberOfHumanAnimations = 20;
-var humanAnimation = new Array(numberOfHumanAnimations);
-function initHumans() {
-  for (var i = 0; i < numberOfHumanAnimations; i++) {
-    // Position is in a square of width 1.
-    humanAnimation[i] = {
-      x: Math.random(),
-      y: Math.random(),
-      targetx: Math.random(),
-      targety: Math.random(),
-      period: (Math.random() * 20 + 3)|0,
-      tick: 0
-    };
-  }
-}
-initHumans();
-
-// Update animations related to humans. See humanAnimation.
-function updateHumans() {
-  for (var i = 0; i < humanAnimation.length; i++) {
-    var human = humanAnimation[i];
-    human.x += (human.targetx - human.x) / human.period;
-    human.y += (human.targety - human.y) / human.period;
-    human.tick++;
-    if (human.tick > human.period) {
-      // New target.
-      human.targetx = Math.random();
-      human.targety = Math.random();
-      human.tick = 0;
-    }
-  }
-}
 
 // Pixels currently on display. Useful for smooth animations.
 var displayedPaint = document.createElement('canvas');
@@ -1217,85 +1163,6 @@ displayedPaint.width = gs.width;
 displayedPaint.height = gs.height;
 var displayedPaintContext = displayedPaint.getContext('2d');
 
-// Paint the animation of people moving around.
-// gs is the GraphicState.
-function paintHumans(gs, humanityData) {
-  var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
-  if (size < 20) { return; }
-  ctx.drawImage(displayedPaint, 0, 0);
-  for (var tileKey in humanityData) {
-    var tileKeyCoord = tileKey.split(':');
-    var q = +tileKeyCoord[0];
-    var r = +tileKeyCoord[1];
-    var human = humanityData[tileKey];
-    var tile = terrain.tile(terrain.tileFromKey(tileKey));
-    var centerPixel = pixelFromTile({ q:q, r:r }, origin, size);
-    var cx = centerPixel.x;
-    var cy = centerPixel.y;
-    // Count different manufacture to show.
-    var ownManufacture = [];
-    var manufactures = [2,4,8,16,32,64];
-    for (var mi = 0; mi < manufactures.length; mi++) {
-      if ((human.o & manufactures[mi]) !== 0) {
-        ownManufacture.push(manufactures[mi]);
-      }
-    }
-    var onABoat = (tile.type === tileTypes.water
-        || tile.type === tileTypes.swamp)
-        && (human.o & manufacture.boat) !== 0;
-    var flyingOverWater = (tile.type === tileTypes.water
-        || tile.type === tileTypes.swamp)
-        && (human.o & manufacture.plane) !== 0;
-    var number = human.h;
-    if (number > humanAnimation.length) { number = humanAnimation.length; }
-    // Paint people.
-    for (var i = 0; i < number; i++) {
-      var animation = humanAnimation[
-        Math.abs(i+q^r^human.f) % humanAnimation.length];
-      var animx = (cx - size + animation.x * 2 * size)|0;
-      var animy = (cy - size + animation.y * 2 * size)|0;
-      var shownManufacture = -1;
-      if (onABoat) {
-        shownManufacture = manufacture.boat;
-      } else if (flyingOverWater) {
-        shownManufacture = manufacture.plane;
-      } else if (ownManufacture.length > 0) {
-        shownManufacture = ownManufacture[i % ownManufacture.length];
-      }
-      paintHuman(gs, shownManufacture, tile, animx, animy, size);
-    }
-  }
-}
-
-function paintHuman(gs, shownManufacture, tile, animx, animy) {
-  var ctx = gs.ctx; var size = gs.hexSize;
-  var pixel = size/20;
-  if (shownManufacture < 0) {
-    ctx.fillStyle = 'black';
-    ctx.fillRect(animx, animy, pixel, 2*pixel);
-  } else if (shownManufacture === manufacture.boat) {
-    ctx.fillStyle = '#aaf';
-    ctx.fillRect(animx - pixel, animy - pixel, pixel, pixel);
-    ctx.fillRect(animx, animy, 7*pixel, pixel);
-    ctx.fillRect(animx + 7*pixel, animy - pixel, pixel, pixel);
-  } else if (shownManufacture === manufacture.car) {
-    ctx.fillStyle = '#420';
-    ctx.fillRect(animx, animy, 3*pixel, 2*pixel);
-  } else if (shownManufacture === manufacture.plane) {
-    ctx.fillStyle = '#edf';
-    ctx.fillRect(animx - pixel, animy - pixel, 2*pixel, pixel);
-    ctx.fillRect(animx, animy, 9*pixel, pixel);
-    ctx.fillRect(animx + 5*pixel, animy - pixel, pixel, pixel);
-    ctx.fillRect(animx + 3*pixel, animy + pixel, pixel, pixel);
-  } else if (shownManufacture === manufacture.artillery) {
-    ctx.fillStyle = '#425';
-    ctx.fillRect(animx - 2*pixel, animy, 5*pixel, 2*pixel);
-    ctx.fillRect(animx, animy - 1*pixel, 5*pixel, 1*pixel);
-  } else if (shownManufacture === manufacture.gun) {
-    ctx.fillStyle = '#440';
-    ctx.fillRect(animx, animy, pixel, 2*pixel);
-  }
-}
 
 var marchingAnts = 0;
 
@@ -1539,6 +1406,14 @@ gs.canvas.onmousedown = function mouseInputManagement(event) {
   var posTile = tileFromPixel(pixelFromClient(event), gs.origin, gs.hexSize);
   // Move there.
   currentTile = posTile;
+  var terrainTile = terrain.tile(currentTile);
+  switch (terrainTile.t) {
+  case element.earth: uitile.textContent = 'Earth'; break;
+  case element.fire: uitile.textContent = 'Fire'; break;
+  case element.air: uitile.textContent = 'Air'; break;
+  case element.water: uitile.textContent = 'Water'; break;
+  }
+  uitile.style.color = colorFromElement[terrainTile.t];
   accessibleTiles = terrain.accessibleTiles(currentTile);
   paint(gs);
 
@@ -1623,6 +1498,62 @@ function inertiaDragMap() {
   });
 }
 
+
+function Ai(camp) {
+  this.camp = camp;
+}
+Ai.prototype = {
+  camp: null,
+  move: function() {
+    // Find all accessible tiles.
+    // List of { tile: {q,r}, nextTile: {q,r}, score: number }.
+    var options = [];
+    for (var tileKey in visibleTiles) {
+      var tile = terrain.tileFromKey(tileKey);
+      var terrainTile = terrain.tile(tile);
+      if (terrainTile.c === this.camp.id) {
+        var accessibleTiles = terrain.accessibleTiles(tile);
+        for (var nextTileKey in accessibleTiles) {
+          var nextTile = terrain.tileFromKey(nextTileKey);
+          options.push({
+            tile: tile,
+            nextTile: nextTile,
+            score: this.scoreTile(nextTile, tile),
+          });
+        }
+      }
+    }
+    var best = options[0];
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].score > best) {
+        best = options[i];
+      }
+    }
+    return {
+      type: planType.move,
+      at: terrain.keyFromTile(best.tile),
+      to: terrain.keyFromTile(best.nextTile),
+    };
+  },
+  // tile: {q,r}
+  scoreTile: function(tile, fromTile) {
+    var score = 0;
+    var terrainTile = terrain.tile(tile);
+    var fromTerrainTile = terrain.tile(fromTile);
+    if (terrainTile.r) { score += 10; }
+    if (terrainTile.c !== this.camp.id) {
+      if (terrainTile.p > fromTerrainTile.p) {
+        score++;
+      } else {
+        score += 5;
+      }
+    }
+    if (terrain.transitionElement(fromTerrainTile.t, terrainTile.t)) {
+      score += 5;
+    }
+    return score;
+  },
+};
 // Game state.
 
 var terrain;
@@ -1672,6 +1603,26 @@ Camp.prototype = {
   baseTile: null,
   // Number of resources obtained.
   resources: 0,
+  bases: 1,
+  addTerrain: function(terrainTile) {
+    if (terrainTile.c !== this.id) {
+      this.bases++;
+      if (terrainTile.r) {
+        this.resources++;
+      }
+      if (terrainTile.c != null) {
+        gameState.camps[terrainTile.c].rmTerrain(terrainTile);
+      }
+    }
+  },
+  rmTerrain: function(terrainTile) {
+    if (terrainTile.c === this.id) {
+      this.bases--;
+      if (terrainTile.r) {
+        this.resources--;
+      }
+    }
+  },
 }
 
 // Object containing:
@@ -1694,15 +1645,25 @@ function GameState() {
       this.resources++;
     }
   }
+  this.ai = new Ai(this.camps[1]);
 }
 GameState.prototype = {
   camps: [],
+  ai: null,
   turn: 0,
   resources: 0,
   nextTurn: function() {
     this.turn = (this.turn + 1) % numberOfCamps;
+    uiresources.textContent = this.camps.map(function(camp) {
+      return camp.resources; }).join(' / ');
+    uibases.textContent = this.camps.map(function(camp) {
+      return camp.bases; }).join(' / ');
     // Is the game won?
     this.checkWinConditions();
+    // AI.
+    if (ai && this.turn === 1) {
+      this.move(this.ai.move());
+    }
   },
 
   // A move is a {type: planType, at: "q:r", to: "q:r", element}.
@@ -1759,15 +1720,11 @@ GameState.prototype = {
           // Block secondary tiles.
           for (var i = 0; i < path.length - 1; i++) {
             var pathTerrainTile = terrain.tile(terrain.tileFromKey(path[i]));
-            if (pathTerrainTile.c !== this.turn) {
-              this.camps[this.turn].resources++;
-            }
+            this.camps[this.turn].addTerrain(pathTerrainTile);
             pathTerrainTile.c = this.turn;
             pathTerrainTile.p = 0;
           }
-          if (toTerrainTile.c !== this.turn) {
-            this.camps[this.turn].resources++;
-          }
+          this.camps[this.turn].addTerrain(toTerrainTile);
           toTerrainTile.c = this.turn;
           toTerrainTile.p = atTerrainTile.p;
         }
@@ -1797,6 +1754,9 @@ GameState.prototype = {
       var nextTile = terrain.tileFromKey(nextTileKey);
       var nextTerrainTile = terrain.tile(nextTile);
       this.killSubgraph(nextTile, camp, visited);
+    }
+    if (this.camps[terrainTile.c] != null) {
+      this.camps[terrainTile.c].rmTerrain(terrainTile);
     }
     terrainTile.c = undefined;
     terrainTile.p = 0;
@@ -1887,6 +1847,12 @@ function setUpGame() {
   gameState = new GameState();
   paint(gs);
 }
+
+
+var ai = true;
+function uiCheckAi() { ai = uiai.checked; }
+uihotseat.addEventListener('change', uiCheckAi);
+uiai.addEventListener('change', uiCheckAi);
 
 
 setUpGame();

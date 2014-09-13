@@ -57,6 +57,6 @@ function streamFromString(str) {
 bundle('.js', [
   'terrain.js',
   'graphics.js',
+  'ai.js',
   'engine.js',
-  'ui.js',
 ], { closure: true });

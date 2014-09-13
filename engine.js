@@ -47,6 +47,26 @@ Camp.prototype = {
   baseTile: null,
   // Number of resources obtained.
   resources: 0,
+  bases: 1,
+  addTerrain: function(terrainTile) {
+    if (terrainTile.c !== this.id) {
+      this.bases++;
+      if (terrainTile.r) {
+        this.resources++;
+      }
+      if (terrainTile.c != null) {
+        gameState.camps[terrainTile.c].rmTerrain(terrainTile);
+      }
+    }
+  },
+  rmTerrain: function(terrainTile) {
+    if (terrainTile.c === this.id) {
+      this.bases--;
+      if (terrainTile.r) {
+        this.resources--;
+      }
+    }
+  },
 }
 
 // Object containing:
@@ -69,15 +89,25 @@ function GameState() {
       this.resources++;
     }
   }
+  this.ai = new Ai(this.camps[1]);
 }
 GameState.prototype = {
   camps: [],
+  ai: null,
   turn: 0,
   resources: 0,
   nextTurn: function() {
     this.turn = (this.turn + 1) % numberOfCamps;
+    uiresources.textContent = this.camps.map(function(camp) {
+      return camp.resources; }).join(' / ');
+    uibases.textContent = this.camps.map(function(camp) {
+      return camp.bases; }).join(' / ');
     // Is the game won?
     this.checkWinConditions();
+    // AI.
+    if (ai && this.turn === 1) {
+      this.move(this.ai.move());
+    }
   },
 
   // A move is a {type: planType, at: "q:r", to: "q:r", element}.
@@ -134,15 +164,11 @@ GameState.prototype = {
           // Block secondary tiles.
           for (var i = 0; i < path.length - 1; i++) {
             var pathTerrainTile = terrain.tile(terrain.tileFromKey(path[i]));
-            if (pathTerrainTile.c !== this.turn) {
-              this.camps[this.turn].resources++;
-            }
+            this.camps[this.turn].addTerrain(pathTerrainTile);
             pathTerrainTile.c = this.turn;
             pathTerrainTile.p = 0;
           }
-          if (toTerrainTile.c !== this.turn) {
-            this.camps[this.turn].resources++;
-          }
+          this.camps[this.turn].addTerrain(toTerrainTile);
           toTerrainTile.c = this.turn;
           toTerrainTile.p = atTerrainTile.p;
         }
@@ -172,6 +198,9 @@ GameState.prototype = {
       var nextTile = terrain.tileFromKey(nextTileKey);
       var nextTerrainTile = terrain.tile(nextTile);
       this.killSubgraph(nextTile, camp, visited);
+    }
+    if (this.camps[terrainTile.c] != null) {
+      this.camps[terrainTile.c].rmTerrain(terrainTile);
     }
     terrainTile.c = undefined;
     terrainTile.p = 0;
@@ -262,6 +291,12 @@ function setUpGame() {
   gameState = new GameState();
   paint(gs);
 }
+
+
+var ai = true;
+function uiCheckAi() { ai = uiai.checked; }
+uihotseat.addEventListener('change', uiCheckAi);
+uiai.addEventListener('change', uiCheckAi);
 
 
 setUpGame();

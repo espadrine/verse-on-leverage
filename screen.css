@@ -1,30 +1,24 @@
 body { margin: 0; font-family: sans-serif; }
+html { background-color: black; }
 canvas.maincanvas { top: 0; }
 
-div#controller { position: absolute; z-index: 1; }
-div#controller > svg { width: 50px; height: 50px; float: left; }
-div#controller > svg > path { cursor: pointer; }
-path.hex { stroke: white; stroke-width: 1.8px; }
-path.gum { stroke: white; stroke-width: 1.5px; }
-path.dust { stroke: #aaa; }
-div.controlPanel {
-  display: none;
-  border: 2px solid white;
-  color: #f7f;
-  background: #800080;
-  position: relative;
-  clear: left;
-  max-height: calc(100vh - 16px - 58px);
-  overflow: auto;
-  top: -16px;
-  z-index: -1;
-  width: 196px;
-  padding: 10px 0;
+#controller {
+  position: absolute;
   text-align: center;
-  box-shadow: 2px 2px 12px black;
-  border-bottom-right-radius: 100% 12px;
-  border-top-right-radius: 10px 60px;
-  border-top-left-radius: 10px 60px;
-  border-bottom-left-radius: 3px;
+  z-index: 1;
+  top: 0px;
+  width: 50%;
+  left: 50%;
+  margin-left: -25%;
+  padding: 0px 5px 5px 5px;
+  color: silver;
+  background: #111;
+  border: 2px solid #111;
+  border-radius: 4px;
+  font-style: italic;
+  font-weight: bold;
+  box-shadow: #999 1px 1px inset, #999 -1px -1px inset;
 }
-div.controlPanel > p { padding: 10px; }
+.bases { color: #fa7; }
+.res { color: #dd0; }
+.tile { color: #7a4; }
