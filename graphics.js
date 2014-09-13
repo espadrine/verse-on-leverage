@@ -698,6 +698,14 @@ function paintNoise(gs, end) {
   };
 }
 
+// Audio
+var audiocr = new Audio();
+var audiopop = new Audio();
+window.addEventListener('load', function() {
+  audiocr.src = 'cr.mp3';
+  audiopop.src = 'pop.mp3';
+});
+
 // Paint visible tiles' resources.
 function paintResources(gs) {
   var width = gs.width;
@@ -725,10 +733,10 @@ function paintResources(gs) {
 
         if (t.r) {
           ctx.beginPath();
-          ctx.arc(cx, cy, 10, 0, 2*Math.PI, true);
+          ctx.arc(cx, cy, 7, 0, 2*Math.PI, true);
           ctx.closePath();
-          ctx.fillStyle = 'black';
-          ctx.fill();
+          ctx.strokeStyle = 'black';
+          ctx.stroke();
         }
 
         cx += hexHorizDistance;
@@ -1220,6 +1228,7 @@ function dragMap(event) {
   // Save the last mouse position.
   lastMousePosition.clientX = event.clientX;
   lastMousePosition.clientY = event.clientY;
+  if (audiocr.paused) { audiocr.play(); }
   targetTile = tileFromPixel(pixelFromClient(lastMousePosition),
       gs.origin, gs.hexSize);
   paint(gs);

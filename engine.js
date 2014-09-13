@@ -97,6 +97,7 @@ GameState.prototype = {
   turn: 0,
   resources: 0,
   nextTurn: function() {
+    if (audiopop.paused) { audiopop.play(); }
     this.turn = (this.turn + 1) % numberOfCamps;
     uiresources.textContent = this.camps.map(function(camp) {
       return camp.resources; }).join(' / ');
