@@ -23,12 +23,14 @@ Ai.prototype = {
         }
       }
     }
+    console.log(JSON.stringify(options));
     var best = options[0];
     for (var i = 0; i < options.length; i++) {
-      if (options[i].score > best) {
+      if (options[i].score > best.score) {
         best = options[i];
       }
     }
+    console.log('picked', JSON.stringify(best));
     return {
       type: planType.move,
       at: terrain.keyFromTile(best.tile),

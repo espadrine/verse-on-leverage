@@ -1003,7 +1003,7 @@ function paintLink(gs, tileKey) {
     var to = pixelFromTile(terrain.tileFromKey(next), gs.origin, gs.hexSize);
     var campColor = campHsl(terrainTile.c, 50, 40);
     paintMouseMovement(gs, from, to, campColor);
-    ctx.setLineDash([2, 10]);
+    ctx.setLineDash(marchingAntsDash);
     ctx.lineDashOffset = marchingAnts;
     ctx.beginPath();
     ctx.moveTo(to.x, to.y);
@@ -1173,10 +1173,11 @@ var displayedPaintContext = displayedPaint.getContext('2d');
 
 
 var marchingAnts = 0;
+var marchingAntsDash = [2, 10];
+var marchingAntsPhase = marchingAntsDash[0] + marchingAntsDash[1];
 
 function animations() {
-  marchingAnts += 1;
-  if (marchingAnts >= MAX_INT) { marchingAnts = 0; }
+  marchingAnts = ((marchingAnts|0) + 1) % marchingAntsPhase;
   //paintHumans(gs, humanityData);
   //updateHumans();
 }
@@ -1443,12 +1444,14 @@ Ai.prototype = {
         }
       }
     }
+    console.log(JSON.stringify(options));
     var best = options[0];
     for (var i = 0; i < options.length; i++) {
-      if (options[i].score > best) {
+      if (options[i].score > best.score) {
         best = options[i];
       }
     }
+    console.log('picked', JSON.stringify(best));
     return {
       type: planType.move,
       at: terrain.keyFromTile(best.tile),
