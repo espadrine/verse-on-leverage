@@ -62,19 +62,47 @@ Terrain.prototype = {
 
   // Return the accessible tiles from a certain spot,
   // as a map from "q:r" to a list of "q:r" tiles it would occupy.
-  // True if visible, false if hidden.
   // tile: {q,r}
   accessibleTiles: function(tile) {
     var terrainTile = this.tile(tile);
-    var nextTiles = Object.create(null);
-
     // Is this tile acceptable?
     if (terrainTile.c == null) {
       // FIXME: maybe show tiles that lead to this one.
-      return nextTiles;
+      return {};
     }
-    if (terrainTile.p <= 0) { return nextTiles; }
+    if (terrainTile.p <= 0) { return {}; }
 
+    var nextTiles = this.nextTiles(tile);
+
+    for (var targetTileKey in nextTiles) {
+      for (var i = 0; i < nextTiles[targetTileKey].length; i++) {
+        var tileKey = nextTiles[targetTileKey][i];
+        var tile = this.tileFromKey(tileKey);
+        var thisTerrain = this.tile(tile);
+        // External tiles or already occupied tiles are removed.
+        if (!visibleTiles[tileKey]
+         || (thisTerrain.c === terrainTile.c)
+         // Interrupted along the path.
+         || (i < nextTiles[targetTileKey].length - 1
+           && thisTerrain.c != null)
+         // We already have a link there.
+         || (terrainTile.v.indexOf(tileKey) >= 0)
+         || (terrainTile.n.indexOf(tileKey) >= 0)) {
+          delete nextTiles[targetTileKey];
+          break;
+        }
+      }
+    }
+
+    return nextTiles;
+  },
+
+  // Return the tiles we can theoretically got o from a certain spot,
+  // as a map from "q:r" to a list of "q:r" tiles it would occupy.
+  // tile: {q,r}
+  nextTiles: function(tile) {
+    var terrainTile = this.tile(tile);
+    var nextTiles = Object.create(null);
     var tileKey;
     if (terrainTile.t === element.earth) {
       // All neighbors.
@@ -164,22 +192,6 @@ Terrain.prototype = {
       neighbor = this.neighborFromTile(neighbor, 5);
       tileKey = this.keyFromTile(neighbor);
       nextTiles[tileKey] = [prevTileKey, tileKey];
-    }
-
-    for (var targetTileKey in nextTiles) {
-      for (var i = 0; i < nextTiles[targetTileKey].length; i++) {
-        var tileKey = nextTiles[targetTileKey][i];
-        // External tiles or already occupied tiles are removed.
-        var tile = this.tileFromKey(tileKey);
-        var thisTerrain = this.tile(tile);
-        if (!visibleTiles[tileKey]
-         || (thisTerrain.c === terrainTile.c)
-         // Interrupted along the path.
-         || (i < nextTiles[targetTileKey].length-1 && thisTerrain.c != null)) {
-          delete nextTiles[targetTileKey];
-          break;
-        }
-      }
     }
 
     return nextTiles;
@@ -1439,7 +1451,7 @@ Ai.prototype = {
           options.push({
             tile: tile,
             nextTile: nextTile,
-            score: this.scoreTile(nextTile, tile),
+            score: this.scoreTile(tile, nextTile),
           });
         }
       }
@@ -1459,7 +1471,7 @@ Ai.prototype = {
     };
   },
   // tile: {q,r}
-  scoreTile: function(tile, fromTile) {
+  scoreTile: function(fromTile, tile) {
     var score = 0;
     var terrainTile = terrain.tile(tile);
     var fromTerrainTile = terrain.tile(fromTile);
@@ -1471,7 +1483,7 @@ Ai.prototype = {
         score += 5;
       }
     }
-    if (terrain.transitionElement(fromTerrainTile.t, terrainTile.t)) {
+    if (terrain.transitionTile(fromTerrainTile.t, terrainTile.t)) {
       score += 5;
     }
     return score;

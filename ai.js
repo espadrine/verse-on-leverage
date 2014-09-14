@@ -18,7 +18,7 @@ Ai.prototype = {
           options.push({
             tile: tile,
             nextTile: nextTile,
-            score: this.scoreTile(nextTile, tile),
+            score: this.scoreTile(tile, nextTile),
           });
         }
       }
@@ -38,7 +38,7 @@ Ai.prototype = {
     };
   },
   // tile: {q,r}
-  scoreTile: function(tile, fromTile) {
+  scoreTile: function(fromTile, tile) {
     var score = 0;
     var terrainTile = terrain.tile(tile);
     var fromTerrainTile = terrain.tile(fromTile);
@@ -50,7 +50,7 @@ Ai.prototype = {
         score += 5;
       }
     }
-    if (terrain.transitionElement(fromTerrainTile.t, terrainTile.t)) {
+    if (terrain.transitionTile(fromTerrainTile.t, terrainTile.t)) {
       score += 5;
     }
     return score;
