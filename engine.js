@@ -141,14 +141,10 @@ GameState.prototype = {
         var accessibleTiles = terrain.accessibleTiles(atTile);
         var path = accessibleTiles[move.to];
 
-        if (toTerrainTile.c != null
-          && toTerrainTile.p < terrain.powerAgainst(toTile) + atTerrainTile.p) {
-          this.killSubgraph(toTile, toTerrainTile.c);
-        }
-
         if (atTerrainTile.v.indexOf(move.to) < 0) {
           atTerrainTile.v.push(move.to);
         }
+
         var startTerrain = atTerrainTile;
         for (var i = 0; i < path.length; i++) {
           var pathTerrainTile = terrain.tile(terrain.tileFromKey(path[i]));
@@ -162,6 +158,10 @@ GameState.prototype = {
         if ((toTerrainTile.c == null)
          || (toTerrainTile.c != null
           && toTerrainTile.p < terrain.powerAgainst(toTile))) {
+
+          console.log('attacking', toTile, '(' + toTerrainTile.p + ')');
+          this.killSubgraph(toTile, toTerrainTile.c);
+
           // Block secondary tiles.
           for (var i = 0; i < path.length - 1; i++) {
             var pathTerrainTile = terrain.tile(terrain.tileFromKey(path[i]));
@@ -172,9 +172,9 @@ GameState.prototype = {
           this.camps[this.turn].addTerrain(toTerrainTile);
           toTerrainTile.c = this.turn;
           toTerrainTile.p = atTerrainTile.p;
-        }
-        if (terrain.transitionTile(atTile, toTile)) {
-          toTerrainTile.p++;
+          if (terrain.transitionTile(atTile, toTile)) {
+            toTerrainTile.p++;
+          }
         }
 
         this.clearDeadSegments();
