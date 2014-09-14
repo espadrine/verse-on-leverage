@@ -159,7 +159,6 @@ GameState.prototype = {
          || (toTerrainTile.c != null
           && toTerrainTile.p < terrain.powerAgainst(toTile))) {
 
-          console.log('attacking', toTile, '(' + toTerrainTile.p + ')');
           this.killSubgraph(toTile, toTerrainTile.c);
 
           // Block secondary tiles.

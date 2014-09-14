@@ -862,7 +862,7 @@ function paintMouseMovement(gs, from, to, color) {
 }
 
 var showTitleScreen = true;
-setTimeout(function() { showTitleScreen = false; paint(gs); }, 8000);
+setTimeout(function() { showTitleScreen = false; }, 8000);
 
 // Paint the UI for population, winner information, etc.
 // gs is the GraphicState.
@@ -947,11 +947,10 @@ var marchingAnts = 0;
 function animations() {
   marchingAnts += 1;
   if (marchingAnts >= MAX_INT) { marchingAnts = 0; }
-  paint(gs);
   //paintHumans(gs, humanityData);
   //updateHumans();
 }
-var animationTimeout = setInterval(animations, 200);
+var animationTimeout = setInterval(animations, 33);
 
 
 
@@ -1032,7 +1031,6 @@ function addHumanMessages(tileMessages, tileKeys, messages) {
       timeout: setTimeout((function (tileKey) {
         return function removeTimeout() {
           delete tileMessages[tileKey];
-          paint(gs);
         };
       }(tileKey)), 2000)
     };
@@ -1085,54 +1083,8 @@ function paintTileMessages(gs) {
 window.onkeydown = function keyInputManagement(event) {
   var voidCache = false;
   var redraw = false;
-  if (event.keyCode === 39 || event.keyCode === 68) {           // → D
-    gs.origin.x0 += (gs.width / 2)|0;
-    redraw = true;
-  } else if (event.keyCode === 38 || event.keyCode === 87) {    // ↑ W
-    gs.origin.y0 -= (gs.height / 2)|0;
-    redraw = true;
-  } else if (event.keyCode === 37 || event.keyCode === 65) {    // ← A
-    gs.origin.x0 -= (gs.width / 2)|0;
-    redraw = true;
-  } else if (event.keyCode === 40 || event.keyCode === 83) {    // ↓ S
-    gs.origin.y0 += (gs.height / 2)|0;
-    redraw = true;
-  } else if (event.keyCode === 187 || event.keyCode === 61) {  // +=
-    // Zoom.
-    gs.hexSize *= 2;
-    gs.origin.x0 = gs.origin.x0 * 2 + (gs.width / 2)|0;
-    gs.origin.y0 = gs.origin.y0 * 2 + (gs.height / 2)|0;
-    voidCache = true;
-    redraw = true;
-  } else if (event.keyCode === 173 || event.keyCode === 189
-          || event.keyCode === 109 || event.keyCode === 219
-          || event.keyCode === 169) {   // -
-    // Unzoom.
-    gs.hexSize = gs.hexSize / 2;
-    gs.origin.x0 = (gs.origin.x0 / 2 - gs.width / 4)|0;
-    gs.origin.y0 = (gs.origin.y0 / 2 - gs.height / 4)|0;
-    voidCache = true;
-    redraw = true;
-  } else if (event.keyCode === 84) {    // T
-    enterMode(selectionModes.travel);
-  } else if (event.keyCode === 67) {    // C
-    enterMode(selectionModes.build);
-  } else if (event.keyCode === 70) {    // F
-    enterMode(selectionModes.split);
-  } else if (event.keyCode === 192) {   // `
-    sendBuild(currentTile, null);   // Destroy building.
-  } else if (event.keyCode === 27) {    // ESC
-    // Close all UI panes.
-    enterMode(selectionModes.normal);
-    helpPane.style.display = 'none';
-  } else if (48 <= event.keyCode && event.keyCode <= 57) {
-    sendBuild(currentTile, buildHotKeys[event.keyCode]);
-  }
-  if (voidCache) {
-    cachedPaint = {};
-  }
-  if (redraw) {
-    paint(gs);
+  if (event.keyCode === 39 || event.keyCode === 68) {           // D
+    // FIXME: show debug mode (all accessible tiles).
   }
 };
 
@@ -1158,8 +1110,6 @@ function mouseDrag(event) {
   gs.canvas.addEventListener('mouseup', mouseEndDrag);
   gs.canvas.addEventListener('mousemove', dragMap);
   currentlyDragging = true;
-  resetDragVector();
-  dragVelTo = setInterval(resetDragVector, dragVelInterval);
 }
 
 function mouseEndDrag(event) {
@@ -1167,16 +1117,12 @@ function mouseEndDrag(event) {
   gs.canvas.removeEventListener('mousemove', dragMap);
   gs.canvas.removeEventListener('mouseup', mouseEndDrag);
   currentlyDragging = false;
-  clearInterval(dragVelTo);
-  computeDragVelocity();
-  inertiaDragMap();
 
   gameState.move({
     type: planType.move,
     at: terrain.keyFromTile(currentTile),
     to: terrain.keyFromTile(targetTile),
   });
-  paint(gs);
 }
 
 gs.canvas.onmousedown = function mouseInputManagement(event) {
@@ -1193,7 +1139,6 @@ gs.canvas.onmousedown = function mouseInputManagement(event) {
   }
   uitile.style.color = colorFromElement[terrainTile.t];
   accessibleTiles = terrain.accessibleTiles(currentTile);
-  paint(gs);
 
   if (event.button === 0) {
     gs.canvas.addEventListener('mouseup', mouseSelection);
@@ -1223,57 +1168,23 @@ var currentlyDragging = false;
 function dragMap(event) {
   if (drawingWhileDragging) { return; }
   drawingWhileDragging = true;
-  var velocityX = (lastMousePosition.clientX - event.clientX);
-  var velocityY = (lastMousePosition.clientY - event.clientY);
   // Save the last mouse position.
   lastMousePosition.clientX = event.clientX;
   lastMousePosition.clientY = event.clientY;
   if (audiocr.paused) { audiocr.play(); }
   targetTile = tileFromPixel(pixelFromClient(lastMousePosition),
       gs.origin, gs.hexSize);
-  paint(gs);
   requestAnimationFrame(function() {
     drawingWhileDragging = false;
   });
 }
 
+requestAnimationFrame(function repaint() {
+  paint(gs);
+  requestAnimationFrame(repaint);
+});
+
 // Prevents Chrome from displaying a silly text cursor
 // while dragging on the canvas.
 canvas.onselectstart = function() { return false; }
-
-// Inertial map dragging.
-
-var dragVelocity = [0, 0];
-var dragVector = [0, 0];
-var dragTime = 0;
-var dragVelTo; // drag timeout.
-var dragVelInterval = 200; // 200ms.
-
-function resetDragVector() {
-  dragTime = Date.now();
-  dragVector[0] = gs.origin.x0;
-  dragVector[1] = gs.origin.y0;
-}
-
-function computeDragVelocity() {
-  dragTime = Date.now() - dragTime;
-  dragVector[0] = gs.origin.x0 - dragVector[0];
-  dragVector[1] = gs.origin.y0 - dragVector[1];
-  var nbFrames = dragTime * 0.03;  // 0.03 frames/ms
-  dragVelocity[0] = (dragVector[0] / nbFrames)|0;
-  dragVelocity[1] = (dragVector[1] / nbFrames)|0;
-}
-
-function inertiaDragMap() {
-  gs.origin.x0 += dragVelocity[0];
-  gs.origin.y0 += dragVelocity[1];
-  dragVelocity[0] = (dragVelocity[0] / 1.1)|0;
-  dragVelocity[1] = (dragVelocity[1] / 1.1)|0;
-  paint(gs);
-  requestAnimationFrame(function() {
-    if (dragVelocity[0] !== 0 || dragVelocity[1] !== 0) {
-      inertiaDragMap();
-    }
-  });
-}
 

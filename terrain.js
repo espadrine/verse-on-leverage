@@ -216,16 +216,13 @@ Terrain.prototype = {
     var sum = 0;
     var terrainTile = this.tile(tile);
     var thisTileKey = this.keyFromTile(tile);
-    console.log('power against', tile, '(' + terrainTile.p + ')');
     for (var tileKey in visibleTiles) {
       var otherTerrain = this.tile(this.tileFromKey(tileKey));
       if (otherTerrain.v.indexOf(thisTileKey) >= 0
        && otherTerrain.c !== terrainTile.c) {
-         console.log(tileKey, 'has', otherTerrain.p);
         sum += otherTerrain.p;
       }
     }
-    console.log('total:', sum);
     return sum;
   },
 
