@@ -485,15 +485,21 @@ function paintAroundTiles(gs, tiles, color) {
 // Paint each tile, and paint links from currentTile.
 // tiles: map from "q:r" to truthy values.
 // gs is the GraphicState.
-function paintSelectedTile(gs, tiles) {
+function paintAccessibleTiles(gs, tiles) {
   var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
   // Show tiles controlled by a player.
   if (currentTile != null && playerCamp != null) {
     paintTileHexagon(gs, currentTile, campHsl(gameState.turn, 50, 40), 5);
     var from = pixelFromTile(currentTile, origin, size);
     for (var tileKey in tiles) {
-      var to = pixelFromTile(terrain.tileFromKey(tileKey), origin, size);
-      paintMouseMovement(gs, from, to, 'rgba(200,200,200,0.5)');
+      var path = tiles[tileKey];
+      var pathFrom = from;
+      for (var i = 0; i < path.length; i++) {
+        var pathTo = pixelFromTile(terrain.tileFromKey(
+              path[i]), origin, size);
+        paintMouseMovement(gs, pathFrom, pathTo, 'rgba(200,200,200,0.5)');
+        pathFrom = pathTo;
+      }
     }
   }
   for (var tileKey in tiles) {
@@ -722,36 +728,34 @@ function paintResources(gs) {
   var hexHorizDistance = size * Math.sqrt(3);
   var hexVertDistance = size * 3/2;
 
-  for (var i = 0; i < 9; i++) {
-    var offLeft = true;     // Each row is offset from the row above.
-    var cx = centerPixel.x;
-    var cy = centerPixel.y;
-    while (cy - hexVertDistance < height) {
-      while (cx - hexHorizDistance < width) {
-        tilePos = tileFromPixel({ x:cx, y:cy }, origin, size);
-        var t = terrain.tile(tilePos);
+  var offLeft = true;     // Each row is offset from the row above.
+  var cx = centerPixel.x;
+  var cy = centerPixel.y;
+  while (cy - hexVertDistance < height) {
+    while (cx - hexHorizDistance < width) {
+      tilePos = tileFromPixel({ x:cx, y:cy }, origin, size);
+      var t = terrain.tile(tilePos);
 
-        if (t.r) {
-          ctx.beginPath();
-          ctx.arc(cx, cy, 7, 0, 2*Math.PI, true);
-          ctx.closePath();
-          ctx.strokeStyle = 'black';
-          ctx.stroke();
-        }
+      if (t.r) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, 7, 0, 2*Math.PI, true);
+        ctx.closePath();
+        ctx.strokeStyle = 'black';
+        ctx.stroke();
+      }
 
-        cx += hexHorizDistance;
-      }
-      cy += hexVertDistance;
-      cx = centerPixel.x;
-      if (offLeft) {
-        cx -= hexHorizDistance / 2;   // This row is offset.
-        offLeft = false;
-      } else {
-        offLeft = true;
-      }
-      cx = cx|0;
-      cy = cy|0;
+      cx += hexHorizDistance;
     }
+    cy += hexVertDistance;
+    cx = centerPixel.x;
+    if (offLeft) {
+      cx -= hexHorizDistance / 2;   // This row is offset.
+      offLeft = false;
+    } else {
+      offLeft = true;
+    }
+    cx = cx|0;
+    cy = cy|0;
   }
 }
 
@@ -870,7 +874,7 @@ function paintIntermediateUI(gs) {
   var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
   paintLinks(gs);
   // Paint the set of accessible tiles.
-  paintSelectedTile(gs, accessibleTiles);
+  paintAccessibleTiles(gs, accessibleTiles);
   if (currentlyDragging) {
     var from = pixelFromTile(tileFromPixel(pixelFromClient(startMousePosition),
           gs.origin, gs.hexSize), gs.origin, gs.hexSize);
