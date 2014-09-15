@@ -1600,9 +1600,18 @@ GameState.prototype = {
       return camp.bases; }).join(' / ');
     // Is the game won?
     this.checkWinConditions();
-    // AI.
-    if (ai && this.turn === 1) {
-      this.move(this.ai.move());
+    if (gameOver != null) {
+      if (gameOver.winners[0] === playerCamp) {
+        if (!localStorage.getItem('gamesWon')) {
+          localStorage.setItem('gamesWon', 0);
+        }
+        localStorage.setItem('gamesWon', (+localStorage.getItem('gamesWon'))+1);
+      }
+    } else {
+      // AI.
+      if (ai && this.turn === 1) {
+        this.move(this.ai.move());
+      }
     }
   },
 
@@ -1753,12 +1762,6 @@ GameState.prototype = {
           winType: 'Economic',
         };
       }
-    }
-    if (gameOver != null && gameOver.winners[0] === playerCamp) {
-      if (!localStorage.getItem('gamesWon')) {
-        localStorage.setItem('gamesWon', 0);
-      }
-      localStorage.setItem('gamesWon', (+localStorage.getItem('gamesWon'))+1);
     }
   },
 
