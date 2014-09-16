@@ -67,6 +67,25 @@ Camp.prototype = {
       }
     }
   },
+
+  options: function() {
+    var options = [];
+    for (var tileKey in visibleTiles) {
+      var tile = terrain.tileFromKey(tileKey);
+      var terrainTile = terrain.tile(tile);
+      if (terrainTile.c === this.id) {
+        var accessibleTiles = terrain.accessibleTiles(tile);
+        for (var nextTileKey in accessibleTiles) {
+          var nextTile = terrain.tileFromKey(nextTileKey);
+          options.push({
+            tile: tile,
+            nextTile: nextTile,
+          });
+        }
+      }
+    }
+    return options;
+  },
 }
 
 // Object containing:
@@ -265,6 +284,15 @@ GameState.prototype = {
             return self.camps[c2].resources - self.camps[c1].resources;
           }),
           winType: 'Economic',
+        };
+      }
+      // Are we starved?
+      if (this.camps[i].options().length <= 0) {
+        return gameOver = {
+          winners: this.listCamps().sort(function(c1, c2) {
+            return self.camps[c2].resources - self.camps[c1].resources;
+          }),
+          winType: 'Siege',
         };
       }
     }
