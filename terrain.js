@@ -53,6 +53,18 @@ Terrain.prototype = {
     }
   },
 
+  // Check whether two given tiles are neighbours.
+  // from, to: {q,r}
+  areNeighbours: function(from, to) {
+    for (var i = 0; i < 6; i++) {
+      var neighbor = this.neighborFromTile(from, i);
+      if (neighbor.q === to.q && neighbor.r === to.r) {
+        return true;
+      }
+    }
+    return false;
+  },
+
   // Return a string key unique to the tile.
   keyFromTile: function keyFromTile(tile) { return tile.q + ':' + tile.r; },
   tileFromKey: function tileFromKey(key) {

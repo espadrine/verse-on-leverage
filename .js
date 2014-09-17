@@ -53,6 +53,18 @@ Terrain.prototype = {
     }
   },
 
+  // Check whether two given tiles are neighbours.
+  // from, to: {q,r}
+  areNeighbours: function(from, to) {
+    for (var i = 0; i < 6; i++) {
+      var neighbor = this.neighborFromTile(from, i);
+      if (neighbor.q === to.q && neighbor.r === to.r) {
+        return true;
+      }
+    }
+    return false;
+  },
+
   // Return a string key unique to the tile.
   keyFromTile: function keyFromTile(tile) { return tile.q + ':' + tile.r; },
   tileFromKey: function tileFromKey(key) {
@@ -1472,16 +1484,22 @@ Ai.prototype = {
     var score = 0;
     var terrainTile = terrain.tile(tile);
     var fromTerrainTile = terrain.tile(fromTile);
-    if (terrainTile.r) { score += 10; }
-    if (terrainTile.c !== this.camp.id) {
-      if (terrainTile.p > fromTerrainTile.p) {
-        score++;
+    if (terrainTile.r) { score += 5; }
+    if (terrainTile.c != null && terrainTile.c !== this.camp.id) {
+      if (fromTerrainTile.p > terrainTile.p) {
+        score += 7;
       } else {
-        score += 5;
+        score++;
       }
     }
+    // Covering more ground is good.
+    // (Except next to enemies, because it creates weak points, but
+    // we're not that smart yet.)
+    if (!terrain.areNeighbours(fromTile, tile)) {
+      score += 2;
+    }
     if (terrain.transitionTile(fromTerrainTile.t, terrainTile.t)) {
-      score += 5;
+      score += 6;
     }
     return score;
   },
