@@ -319,9 +319,10 @@ function tileFromPixel(px, px0, size) {
 // return a pixel {x, y} of the hexagon's center.
 // `size` is the radius of the smallest disk containing the hexagon.
 function pixelFromTile(p, px0, size) {
+  var noisy = noisyPixel((size >> 1), p);
   return {
-    x: ((size * Math.sqrt(3) * (p.q + p.r / 2))|0) - px0.x0,
-    y: (size * 3/2 * p.r) - px0.y0
+    x: ((size * Math.sqrt(3) * (p.q + p.r / 2))|0) - px0.x0 + noisy.x,
+    y: (size * 3/2 * p.r) - px0.y0 + noisy.y,
   };
 }
 
@@ -531,7 +532,7 @@ function pointFromVertex(gs, vertex, hexHorizDistance, noisy) {
   var cy = cp.y|0;
   var halfHorizDistance = hexHorizDistance/2|0;
   var halfSize = size/2|0;
-  var ncx = noisy? noisyPixel(size, tile): {x:0, y:0};
+  var ncx = noisy? noisyPixel(size >> 1, tile): {x:0, y:0};
   if (vertexSide === 0) {
     return { x: cx + halfHorizDistance + ncx.x, y: cy + halfSize + ncx.y };
   } else if (vertexSide === 1) {
@@ -968,48 +969,20 @@ window.addEventListener('load', function() {
 
 // Paint visible tiles' resources.
 function paintResources(gs) {
-  var width = gs.width;
-  var height = gs.height;
   // The `origin` {x0, y0} is the position of the top left pixel on the screen,
   // compared to the pixel (0, 0) on the map.
   var ctx = gs.ctx; var size = gs.hexSize; var origin = gs.origin;
-  // This is a jigsaw. We want the corner tiles of the screen.
-  var tilePos = tileFromPixel({ x:0, y:0 }, origin, size);
-  var centerPixel = pixelFromTile({ q: tilePos.q, r: tilePos.r-1 },
-    origin, size);
-  var cx = centerPixel.x;
-  var cy = centerPixel.y;
-  var hexHorizDistance = size * Math.sqrt(3);
-  var hexVertDistance = size * 3/2;
-
-  var offLeft = true;     // Each row is offset from the row above.
-  var cx = centerPixel.x;
-  var cy = centerPixel.y;
-  while (cy - hexVertDistance < height) {
-    while (cx - hexHorizDistance < width) {
-      tilePos = tileFromPixel({ x:cx, y:cy }, origin, size);
-      var t = terrain.tile(tilePos);
-
-      if (t.r) {
-        ctx.beginPath();
-        ctx.arc(cx, cy, 7, 0, 2*Math.PI, true);
-        ctx.closePath();
-        ctx.strokeStyle = 'black';
-        ctx.stroke();
-      }
-
-      cx += hexHorizDistance;
+  for (var tileKey in visibleTiles) {
+    var tile = terrain.tileFromKey(tileKey);
+    var terrainTile = terrain.tile(tile);
+    if (terrainTile.r) {
+      var cp = pixelFromTile(tile, origin, size);
+      ctx.beginPath();
+      ctx.arc(cp.x, cp.y, 7, 0, 2*Math.PI, true);
+      ctx.closePath();
+      ctx.strokeStyle = 'black';
+      ctx.stroke();
     }
-    cy += hexVertDistance;
-    cx = centerPixel.x;
-    if (offLeft) {
-      cx -= hexHorizDistance / 2;   // This row is offset.
-      offLeft = false;
-    } else {
-      offLeft = true;
-    }
-    cx = cx|0;
-    cy = cy|0;
   }
 }
 
