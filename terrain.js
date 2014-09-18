@@ -23,14 +23,15 @@ Terrain.prototype = {
   // - f: fortification (see `element`). (Can be undefined.)
   // - n: next parcels connected to this one (as a list of "q:r").
   // - v: next visible parcels connected to this one (as a list of "q:r").
-  // - a: random number between 0 and 1.
+  // - ax, ay: random number between 0 and 1.
   tile: function tile(coord) {
     var key = this.keyFromTile(coord);
     if (this.data[key] == null) {
       this.data[key] = {
         t: (Math.random() * 4)|0,
         r: (coord.q % 3) === 0 && (coord.r % 3 === 2),
-        a: Math.random(),
+        ax: Math.random(),
+        ay: Math.random(),
         p: 0,
         n: [],
         v: [],
