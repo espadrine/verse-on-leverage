@@ -103,16 +103,10 @@ function makeGraphicState(canvas) {
 }
 
 var canvas = document.getElementById('canvas');
-canvas.width = 1280;
-canvas.height = 720;
-canvas.style.marginLeft = ((document.documentElement.clientWidth - canvas.width) >> 1) + 'px';
+canvas.width = document.documentElement.clientWidth;
+canvas.height = document.documentElement.clientHeight;
 var gs = makeGraphicState(canvas);
 var globalGs = gs;
-// Blink and Webkit get the following wrong.
-// Remove without worry
-// when https://code.google.com/p/chromium/issues/detail?id=168840 is fixed.
-//document.styleSheets[0].insertRule('div.controlPanel { max-height:' +
-//  (gs.height - 16 - 58) + 'px; }', 0);
 
 // Given a list of tile key "q:r" representing hexagon coordinates,
 // construct the path along each hexagon's center.
@@ -896,22 +890,17 @@ function drawTitle(gs, lines, color, offx, offy) {
   var line1 = lines[0];
   var line2 = lines[1];
   var line3 = lines[2];
-  if (color && offx === 0) {
-    drawTitle(gs, lines, null, -5, -5);
-    drawTitle(gs, lines, null, -5, 5);
-    drawTitle(gs, lines, null, 5, -5);
-    drawTitle(gs, lines, null, 5, 5); }
   if (color) { ctx.strokeStyle = 'black'; }
-  ctx.lineWidth = 5;
+  ctx.lineWidth = width / 64;
   ctx.fillStyle = color || 'black';
   ctx.textAlign = 'center';
-  ctx.font = (height / 16) + 'px "Fantasque Sans Mono", sans-serif';
+  ctx.font = (width / 32) + 'px "Fantasque Sans Mono", sans-serif';
   if (color) { ctx.strokeText(line1, width / 2, height * 1/3); }
   ctx.fillText(line1, width / 2 + offx, height * 1/3 + offy);
-  ctx.font = (height / 8) + 'px "Fantasque Sans Mono", sans-serif';
+  ctx.font = (width / 16) + 'px "Fantasque Sans Mono", sans-serif';
   if (color) { ctx.strokeText(line2, width / 2, height * 13/24); }
   ctx.fillText(line2, width / 2 + offx, height * 13/24 + offy);
-  ctx.font = (height / 16) + 'px "Fantasque Sans Mono", sans-serif';
+  ctx.font = (width / 32) + 'px "Fantasque Sans Mono", sans-serif';
   if (color) { ctx.strokeText(line3, width / 2, height * 2/3); }
   ctx.fillText(line3, width / 2 + offx, height * 2/3 + offy);
   ctx.textAlign = 'start';
