@@ -1740,6 +1740,10 @@ GameState.prototype = {
       if (index >= 0) {
         terrainTile.n.splice(index, 1);
       }
+      var index = terrainTile.v.indexOf(targetTileKey);
+      if (index >= 0) {
+        terrainTile.v.splice(index, 1);
+      }
     }
   },
 
