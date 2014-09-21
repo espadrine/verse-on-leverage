@@ -102,6 +102,7 @@ function GameState() {
   this.camps = new Array(numberOfCamps);
   for (var i = 0; i < numberOfCamps; i++) {
     this.camps[i] = new Camp();
+    this.baseTiles.push(terrain.keyFromTile(this.camps[i].baseTile));
   }
   for (var tileKey in visibleTiles) {
     if (terrain.tile(terrain.tileFromKey(tileKey)).r) {
@@ -112,6 +113,8 @@ function GameState() {
 }
 GameState.prototype = {
   camps: [],
+  // List of "q:r" base tiles of each camp, where the index is a camp id.
+  baseTiles: [],
   ai: null,
   turn: 0,
   resources: 0,
@@ -271,23 +274,25 @@ GameState.prototype = {
 
   checkWinConditions: function() {
     var self = this;
+    var totalResources = 0;
     for (var i = 0; i < numberOfCamps; i++) {
+      totalResources += this.camps[i].resources;
       // Is there a camp without locations?
       if (this.countCampLocations(i) <= 0) {
         return gameOver = {
           winners: this.listCamps().sort(function(c1, c2) {
-            return self.countCampLocations(c2) - self.countCampLocations(c1);
+            return self.camps[c2].resources - self.camps[c1].resources;
           }),
           winType: 'Supremacy',
         };
       }
-      // Have we fetched half the resources?
-      if (this.camps[i].resources >= (this.resources >> 1)) {
+      // Have we fetched all the resources?
+      if (this.camps[i].resources >= this.resources) {
         return gameOver = {
           winners: this.listCamps().sort(function(c1, c2) {
             return self.camps[c2].resources - self.camps[c1].resources;
           }),
-          winType: 'Economic',
+          winType: 'Monopoly',
         };
       }
       // Are we starved?
@@ -299,6 +304,15 @@ GameState.prototype = {
           winType: 'Siege',
         };
       }
+    }
+    // Are all the resources occupied?
+    if (totalResources >= this.resources) {
+      return gameOver = {
+        winners: this.listCamps().sort(function(c1, c2) {
+          return self.camps[c2].resources - self.camps[c1].resources;
+        }),
+        winType: 'Economic',
+      };
     }
   },
 

@@ -100,7 +100,9 @@ Terrain.prototype = {
            && thisTerrain.c != null)
          // We already have a link there.
          || (terrainTile.v.indexOf(tileKey) >= 0)
-         || (terrainTile.n.indexOf(tileKey) >= 0)) {
+         || (terrainTile.n.indexOf(tileKey) >= 0)
+         // It is a camp's base tile.
+         || (gameState.baseTiles.indexOf(tileKey) >= 0)) {
           delete nextTiles[targetTileKey];
           break;
         }
@@ -108,6 +110,11 @@ Terrain.prototype = {
     }
 
     return nextTiles;
+  },
+
+  // a, b: {q,r}
+  sameTile: function(a, b) {
+    return a.q === b.q && a.r === b.r;
   },
 
   // Return the tiles we can theoretically got o from a certain spot,
