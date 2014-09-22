@@ -1,6 +1,6 @@
-body { margin: 0; font-family: sans-serif; }
+body { margin: 0; font-family: 'Fantasque Sans Mono', sans-serif; }
 html { background-color: black; }
-canvas.maincanvas { top: 0; }
+canvas.maincanvas { position: absolute; top: 0; }
 
 #controller {
   position: absolute;
@@ -15,9 +15,9 @@ canvas.maincanvas { top: 0; }
   background: #111;
   border: 2px solid #111;
   border-radius: 4px;
-  font-style: italic;
-  font-weight: bold;
-  box-shadow: #999 1px 1px inset, #999 -1px -1px inset;
+  box-shadow: #999 1px 1px 1px inset, #999 -1px -1px 2px inset;
+  font-size: 90%;
+  text-shadow: 1px 1px #444;
 }
 .bases { color: #fa7; }
 .res { color: #dd0; }
