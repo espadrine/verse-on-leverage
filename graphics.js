@@ -729,12 +729,12 @@ function paintResources(gs) {
 // gs is the GraphicState.
 function paintLinks(gs) {
   for (var tileKey in visibleTiles) {
-    paintLink(gs, tileKey);
+    paintDashedLink(gs, tileKey);
   }
 }
 
 // tileKey: "q:r".
-function paintLink(gs, tileKey) {
+function paintDashedLink(gs, tileKey) {
   var ctx = gs.ctx;
   var tile = terrain.tileFromKey(tileKey);
   var terrainTile = terrain.tile(tile);
@@ -743,12 +743,11 @@ function paintLink(gs, tileKey) {
     var next = terrainTile.n[i];
     var to = pixelFromTile(terrain.tileFromKey(next), gs.origin, gs.hexSize);
     var campColor = campHsl(terrainTile.c, 50, 40);
-    paintMouseMovement(gs, from, to, campColor);
     ctx.setLineDash(marchingAntsDash);
     ctx.lineDashOffset = marchingAnts;
     ctx.beginPath();
-    ctx.moveTo(to.x, to.y);
-    ctx.lineTo(from.x, from.y);
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
     ctx.strokeStyle = campColor;
     ctx.lineWidth = 4;
     ctx.stroke();
