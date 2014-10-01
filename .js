@@ -1140,32 +1140,44 @@ function nth(n) {
   } else { return strNum + 'th'; }
 }
 
+var cachedTitleArgs = JSON.stringify({ lines: [], color: "" });
+var cachedTitleCanvas = document.createElement('canvas');
+
 // Draw three lines of text from a list of strings on the screen.
 // gs is the GraphicState.
-function drawTitle(gs, lines, color, offx, offy) {
-  offx = offx || 0;
-  offy = offy || 0;
-  var ctx = gs.ctx;
-  var width = gs.width;
-  var height = gs.height;
-  var line1 = lines[0];
-  var line2 = lines[1];
-  var line3 = lines[2];
-  if (color) { ctx.strokeStyle = 'black'; }
-  ctx.lineWidth = width / 64;
-  ctx.fillStyle = color || 'black';
-  ctx.textAlign = 'center';
-  ctx.font = (width / 32) + 'px "Fantasque Sans Mono", sans-serif';
-  if (color) { ctx.strokeText(line1, width / 2, height * 1/3); }
-  ctx.fillText(line1, width / 2 + offx, height * 1/3 + offy);
-  ctx.font = (width / 16) + 'px "Fantasque Sans Mono", sans-serif';
-  if (color) { ctx.strokeText(line2, width / 2, height * 13/24); }
-  ctx.fillText(line2, width / 2 + offx, height * 13/24 + offy);
-  ctx.font = (width / 32) + 'px "Fantasque Sans Mono", sans-serif';
-  if (color) { ctx.strokeText(line3, width / 2, height * 2/3); }
-  ctx.fillText(line3, width / 2 + offx, height * 2/3 + offy);
-  ctx.textAlign = 'start';
-  ctx.lineWidth = 1;
+function drawTitle(gs, lines, color) {
+  // Invalidate cache.
+  var args = JSON.stringify({lines:lines, color:color});
+  if (args !== cachedTitleArgs) {
+    cachedTitleArgs = args;
+    cachedTitleCanvas.width = gs.width;
+    cachedTitleCanvas.height = gs.height;
+    var gsBuffer = makeGraphicState(cachedTitleCanvas);
+    gsBuffer.hexSize = gs.hexSize;
+    gsBuffer.origin = gs.origin;
+    var ctx = gsBuffer.ctx;
+    var width = gs.width;
+    var height = gs.height;
+    var line1 = lines[0];
+    var line2 = lines[1];
+    var line3 = lines[2];
+    if (color) { ctx.strokeStyle = 'black'; }
+    ctx.lineWidth = width / 64;
+    ctx.fillStyle = color || 'black';
+    ctx.textAlign = 'center';
+    ctx.font = (width / 32) + 'px "Fantasque Sans Mono", sans-serif';
+    if (color) { ctx.strokeText(line1, width / 2, height * 1/3); }
+    ctx.fillText(line1, width / 2, height * 1/3);
+    ctx.font = (width / 16) + 'px "Fantasque Sans Mono", sans-serif';
+    if (color) { ctx.strokeText(line2, width / 2, height * 13/24); }
+    ctx.fillText(line2, width / 2, height * 13/24);
+    ctx.font = (width / 32) + 'px "Fantasque Sans Mono", sans-serif';
+    if (color) { ctx.strokeText(line3, width / 2, height * 2/3); }
+    ctx.fillText(line3, width / 2, height * 2/3);
+    ctx.textAlign = 'start';
+    ctx.lineWidth = 1;
+  }
+  gs.ctx.drawImage(cachedTitleCanvas, 0, 0);
 }
 
 
