@@ -1372,10 +1372,11 @@ function mouseEndDrag(event) {
     at: terrain.keyFromTile(currentTile),
     to: terrain.keyFromTile(targetTile),
   });
+  setCurrentTile(event);
 }
 
-gs.canvas.onmousedown = function mouseInputManagement(event) {
-  showTitleScreen = false;
+// event: {clientX, clientY} as pixels.
+function setCurrentTile(event) {
   var posTile = tileFromPixel(pixelFromClient(event), gs.origin, gs.hexSize);
   // Move there.
   currentTile = posTile;
@@ -1388,6 +1389,11 @@ gs.canvas.onmousedown = function mouseInputManagement(event) {
   }
   uitile.style.color = colorFromElement[terrainTile.t];
   accessibleTiles = terrain.accessibleTiles(currentTile);
+}
+
+gs.canvas.onmousedown = function mouseInputManagement(event) {
+  showTitleScreen = false;
+  setCurrentTile(event);
 
   if (event.button === 0) {
     gs.canvas.addEventListener('mouseup', mouseSelection);
