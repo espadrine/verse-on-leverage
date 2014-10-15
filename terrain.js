@@ -117,7 +117,7 @@ Terrain.prototype = {
     return a.q === b.q && a.r === b.r;
   },
 
-  // Return the tiles we can theoretically got o from a certain spot,
+  // Return the tiles we can theoretically go to from a certain spot,
   // as a map from "q:r" to a list of "q:r" tiles it would occupy.
   // tile: {q,r}
   nextTiles: function(tile) {

@@ -117,7 +117,7 @@ Terrain.prototype = {
     return a.q === b.q && a.r === b.r;
   },
 
-  // Return the tiles we can theoretically got o from a certain spot,
+  // Return the tiles we can theoretically go to from a certain spot,
   // as a map from "q:r" to a list of "q:r" tiles it would occupy.
   // tile: {q,r}
   nextTiles: function(tile) {
@@ -1388,7 +1388,17 @@ function setCurrentTile(event) {
   case element.water: uitile.textContent = 'Water'; break;
   }
   uitile.style.color = colorFromElement[terrainTile.t];
-  accessibleTiles = terrain.accessibleTiles(currentTile);
+  if (terrainTile.c != null) {
+    accessibleTiles = terrain.accessibleTiles(currentTile);
+  } else {
+    // There is noone on this tile.
+    accessibleTiles = terrain.nextTiles(currentTile);
+    for (var tileKey in accessibleTiles) {
+      if (visibleTiles[tileKey] == null) {
+        delete accessibleTiles[tileKey];
+      }
+    }
+  }
 }
 
 gs.canvas.onmousedown = function mouseInputManagement(event) {
