@@ -1856,6 +1856,8 @@ function setUpGame() {
 
   campCursorId = 0;
   gameState = new GameState();
+  var cp = pixelFromTile(gameState.camps[0].baseTile, gs.origin, gs.hexSize);
+  setCurrentTile({ clientX: cp.x, clientY: cp.y });
   paint(gs);
 }
 
